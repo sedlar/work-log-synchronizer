@@ -138,9 +138,7 @@ class BambooHROAuthClient:
     """Client for handling BambooHR OAuth 2.0 flow."""
 
     SCOPES = [
-        "email", "openid",
-        "time_tracking:read",
-        "offline_access",
+        "openid",
     ]
 
     def __init__(
@@ -171,7 +169,7 @@ class BambooHROAuthClient:
             "response_type": "code",
             "client_id": self.config.client_id,
             "redirect_uri": self.config.redirect_uri,
-            "scope": "+".join(self.SCOPES),
+            "scope": " ".join(self.SCOPES),
             "state": state,
         }
         return f"{self.config.base_url}/authorize.php?request=authorize&{urlencode(params)}"
