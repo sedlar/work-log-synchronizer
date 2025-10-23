@@ -208,8 +208,8 @@ def configure(
             api_key=bamboohr_key,
             storage=storage,
         ) as bamboohr_client:
-            employees = bamboohr_client.get_employees()
-            console.print(f"[green]✓ Connected to BambooHR (found {len(employees)} employees)[/green]")
+            projects = bamboohr_client.list_projects()
+            console.print(f"[green]✓ Connected to BambooHR (found {len(projects)} projects)[/green]")
     except Exception as e:
         console.print(f"[red]✗ Failed to connect to BambooHR: {e}[/red]")
 
