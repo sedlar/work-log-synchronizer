@@ -167,24 +167,32 @@ def sync(
         raise typer.Exit(code=1)
 
 
-@app.command()
-def configure(
-    config_dir: Optional[Path] = typer.Option(
-        None,
-        "--config-dir",
-        help="Configuration directory. Defaults to ~/.work-log-sync/",
-    ),
-) -> None:
-    """Configure Clockify and BambooHR credentials."""
-    setup_logging(config_dir=config_dir)
+def _check_configuration_status(storage: StorageManager) -> dict:
+    """Check and display current configuration status."""
+    state = storage.load_state()
+    clockify_key = storage.get_token("clockify")
+    bamboohr_domain = state.get("bamboohr_domain")
+    bamboohr_client_id = state.get("bamboohr_client_id")
+    bamboohr_client_secret = state.get("bamboohr_client_secret")
 
-    storage = StorageManager(config_dir)
-    config = Config(config_dir)
+    clockify_configured = bool(clockify_key)
+    bamboohr_configured = bool(bamboohr_domain and bamboohr_client_id and bamboohr_client_secret)
 
-    console.print("[bold cyan]Work Log Synchronizer Configuration[/bold cyan]")
+    console.print("[bold cyan]Current Configuration Status[/bold cyan]")
+    clockify_status = "[green]✓ Configured[/green]" if clockify_configured else "[yellow]✗ Not configured[/yellow]"
+    bamboohr_status = "[green]✓ Configured[/green]" if bamboohr_configured else "[yellow]✗ Not configured[/yellow]"
+    console.print(f"  Clockify:  {clockify_status}")
+    console.print(f"  BambooHR:  {bamboohr_status}")
     console.print()
 
-    # Clockify setup
+    return {
+        "clockify_configured": clockify_configured,
+        "bamboohr_configured": bamboohr_configured,
+    }
+
+
+def _configure_clockify(storage: StorageManager) -> str:
+    """Configure Clockify API credentials."""
     console.print("[yellow]Clockify Configuration[/yellow]")
     clockify_key = Prompt.ask(
         "Enter your Clockify API key",
@@ -192,9 +200,12 @@ def configure(
     )
     storage.set_token("clockify", clockify_key)
     console.print("[green]✓ Clockify API key saved[/green]")
+    return clockify_key
 
-    # BambooHR setup
-    console.print("\n[yellow]BambooHR Configuration (OAuth 2.0)[/yellow]")
+
+def _configure_bamboohr(storage: StorageManager) -> tuple[str, str, str]:
+    """Configure BambooHR OAuth credentials."""
+    console.print("[yellow]BambooHR Configuration (OAuth 2.0)[/yellow]")
     bamboohr_domain = Prompt.ask("Enter your BambooHR subdomain (e.g., 'mycompany')")
     bamboohr_client_id = Prompt.ask(
         "Enter your BambooHR OAuth Client ID",
@@ -230,25 +241,84 @@ def configure(
         console.print(f"[red]✗ BambooHR authentication failed: {e}[/red]")
         raise typer.Exit(code=1)
 
-    # Test connections
-    console.print("\n[cyan]Testing connections...[/cyan]")
-    try:
-        with ClockifyClient(api_key=clockify_key, storage=storage) as clockify_client:
-            user = clockify_client.get_current_user()
-            console.print(f"[green]✓ Connected to Clockify as {user.get('name', 'user')}[/green]")
-    except Exception as e:
-        console.print(f"[red]✗ Failed to connect to Clockify: {e}[/red]")
+    return bamboohr_domain, bamboohr_client_id, bamboohr_client_secret
 
-    try:
-        bamboohr_client = BambooHRClient(
-            domain=bamboohr_domain,
-            oauth_client=oauth_client,
-            storage=storage,
-        )
-        projects = bamboohr_client.list_projects()
-        console.print(f"[green]✓ Connected to BambooHR (found {len(projects)} projects)[/green]")
-    except Exception as e:
-        console.print(f"[red]✗ Failed to connect to BambooHR: {e}[/red]")
+
+@app.command()
+def configure(
+    config_dir: Optional[Path] = typer.Option(
+        None,
+        "--config-dir",
+        help="Configuration directory. Defaults to ~/.work-log-sync/",
+    ),
+) -> None:
+    """Configure Clockify and BambooHR credentials selectively."""
+    setup_logging(config_dir=config_dir)
+
+    storage = StorageManager(config_dir)
+    config = Config(config_dir)
+
+    console.print("[bold cyan]Work Log Synchronizer Configuration[/bold cyan]")
+    console.print()
+
+    # Check current configuration
+    status = _check_configuration_status(storage)
+
+    # Ask which service(s) to configure
+    console.print("[cyan]Which service would you like to configure?[/cyan]")
+    choice = Prompt.ask(
+        "Select",
+        choices=["clockify", "bamboohr", "both"],
+        default="both",
+    )
+    console.print()
+
+    configured_services = []
+    clockify_key = None
+    bamboohr_domain = None
+    oauth_client = None
+
+    # Configure Clockify if selected
+    if choice in ["clockify", "both"]:
+        clockify_key = _configure_clockify(storage)
+        configured_services.append("Clockify")
+        console.print()
+
+    # Configure BambooHR if selected
+    if choice in ["bamboohr", "both"]:
+        bamboohr_domain, _, _ = _configure_bamboohr(storage)
+        configured_services.append("BambooHR")
+        console.print()
+
+    # Test connections for newly configured services
+    console.print("[cyan]Testing connections...[/cyan]")
+
+    if choice in ["clockify", "both"]:
+        try:
+            with ClockifyClient(api_key=clockify_key, storage=storage) as clockify_client:
+                user = clockify_client.get_current_user()
+                console.print(f"[green]✓ Connected to Clockify as {user.get('name', 'user')}[/green]")
+        except Exception as e:
+            console.print(f"[red]✗ Failed to connect to Clockify: {e}[/red]")
+
+    if choice in ["bamboohr", "both"]:
+        try:
+            state = storage.load_state()
+            oauth_config = BambooHROAuthConfig(
+                client_id=state.get("bamboohr_client_id", ""),
+                client_secret=state.get("bamboohr_client_secret", ""),
+                domain=state.get("bamboohr_domain", ""),
+            )
+            oauth_client = BambooHROAuthClient(oauth_config, storage=storage)
+            bamboohr_client = BambooHRClient(
+                domain=bamboohr_domain or state.get("bamboohr_domain", ""),
+                oauth_client=oauth_client,
+                storage=storage,
+            )
+            projects = bamboohr_client.list_projects()
+            console.print(f"[green]✓ Connected to BambooHR (found {len(projects)} projects)[/green]")
+        except Exception as e:
+            console.print(f"[red]✗ Failed to connect to BambooHR: {e}[/red]")
 
     console.print("\n[green]Configuration complete![/green]")
     console.print("Run 'work-log-sync sync' to start syncing work logs.")
