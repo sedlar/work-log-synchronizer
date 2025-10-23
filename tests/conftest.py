@@ -4,10 +4,12 @@ import json
 import tempfile
 from datetime import date, datetime, timedelta
 from pathlib import Path
+from unittest.mock import MagicMock
 
 import pytest
 
 from work_log_sync.bamboohr import BambooProject, BambooTask, BambooTimeEntry, BambooEmployee
+from work_log_sync.bamboohr.oauth import BambooHROAuthClient, BambooHROAuthConfig, OAuthToken
 from work_log_sync.clockify import ClockifyProject, ClockifyTask, ClockifyTimeEntry
 from work_log_sync.config import Config
 from work_log_sync.utils import StorageManager
@@ -119,3 +121,32 @@ def sample_bamboo_time_entry(
         taskId=sample_bamboo_task.id,
         notes="Working on feature X",
     )
+
+
+@pytest.fixture
+def oauth_config() -> BambooHROAuthConfig:
+    """Create a sample BambooHR OAuth configuration."""
+    return BambooHROAuthConfig(
+        client_id="test_client_id",
+        client_secret="test_client_secret",
+        domain="testcompany",
+    )
+
+
+@pytest.fixture
+def oauth_token() -> OAuthToken:
+    """Create a sample OAuth token."""
+    return OAuthToken(
+        access_token="test_access_token",
+        refresh_token="test_refresh_token",
+        expires_in=3600,
+    )
+
+
+@pytest.fixture
+def mock_oauth_client(oauth_config: BambooHROAuthConfig, oauth_token: OAuthToken) -> MagicMock:
+    """Create a mock BambooHROAuthClient."""
+    mock_client = MagicMock(spec=BambooHROAuthClient)
+    mock_client.get_token.return_value = oauth_token
+    mock_client.config = oauth_config
+    return mock_client

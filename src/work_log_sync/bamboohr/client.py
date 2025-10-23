@@ -1,6 +1,5 @@
 """BambooHR API client."""
 
-import base64
 import logging
 from datetime import date
 from typing import Any
@@ -8,6 +7,7 @@ from typing import Any
 import httpx
 
 from work_log_sync.bamboohr.models import BambooEmployee, BambooProject, BambooTask, BambooTimeEntry
+from work_log_sync.bamboohr.oauth import BambooHROAuthClient, OAuthToken
 from work_log_sync.utils import StorageManager
 
 logger = logging.getLogger(__name__)
@@ -21,37 +21,45 @@ class BambooHRClient:
     def __init__(
         self,
         domain: str,
-        api_key: str | None = None,
+        oauth_client: BambooHROAuthClient | None = None,
         storage: StorageManager | None = None,
     ) -> None:
-        """Initialize BambooHR client.
+        """Initialize BambooHR client with OAuth authentication.
 
         Args:
             domain: BambooHR domain/subdomain (e.g., 'mycompany').
-            api_key: BambooHR API key. If None, will try to load from storage.
+            oauth_client: BambooHROAuthClient instance for OAuth authentication.
             storage: StorageManager instance for token caching.
 
         Raises:
-            ValueError: If API key is not provided or found.
+            ValueError: If oauth_client is not provided.
         """
         self.domain = domain
         self.storage = storage or StorageManager()
-        self.api_key = api_key or self.storage.get_token("bamboohr")
+        self.oauth_client = oauth_client
 
-        if not self.api_key:
-            raise ValueError("BambooHR API key not provided or found in storage")
-
-        # BambooHR uses Basic Auth with API key as username
-        auth_string = base64.b64encode(f"{self.api_key}:x".encode()).decode()
+        if not oauth_client:
+            raise ValueError("BambooHROAuthClient is required for authentication")
 
         self.client = httpx.Client(
             base_url=f"{self.BASE_URL}/{domain}",
             headers={
                 "Accept": "application/json",
-                "Authorization": f"Basic {auth_string}",
             },
             timeout=30.0,
         )
+
+    def _get_auth_headers(self) -> dict[str, str]:
+        """Get authorization headers with current OAuth token.
+
+        Returns:
+            Dictionary with Authorization header.
+
+        Raises:
+            RuntimeError: If token is not available.
+        """
+        token = self.oauth_client.get_token()
+        return {"Authorization": f"Bearer {token.access_token}"}
 
     def get_employees(self) -> list[BambooEmployee]:
         """Get list of all employees.
@@ -62,7 +70,10 @@ class BambooHRClient:
         Raises:
             httpx.HTTPError: If API request fails.
         """
-        response = self.client.get("/v1/employees/directory")
+        response = self.client.get(
+            "/v1/employees/directory",
+            headers=self._get_auth_headers(),
+        )
         response.raise_for_status()
         data = response.json()
 
@@ -83,7 +94,10 @@ class BambooHRClient:
         Raises:
             httpx.HTTPError: If API request fails.
         """
-        response = self.client.get(f"/v1/employees/{employee_id}")
+        response = self.client.get(
+            f"/v1/employees/{employee_id}",
+            headers=self._get_auth_headers(),
+        )
         response.raise_for_status()
         return BambooEmployee(**response.json())
 
@@ -96,7 +110,10 @@ class BambooHRClient:
         Raises:
             httpx.HTTPError: If API request fails.
         """
-        response = self.client.get("/v1/projects")
+        response = self.client.get(
+            "/v1/projects",
+            headers=self._get_auth_headers(),
+        )
         response.raise_for_status()
         data = response.json()
 
@@ -117,7 +134,10 @@ class BambooHRClient:
         Raises:
             httpx.HTTPError: If API request fails.
         """
-        response = self.client.get(f"/v1/projects/{project_id}")
+        response = self.client.get(
+            f"/v1/projects/{project_id}",
+            headers=self._get_auth_headers(),
+        )
         response.raise_for_status()
         return BambooProject(**response.json())
 
@@ -133,7 +153,10 @@ class BambooHRClient:
         Raises:
             httpx.HTTPError: If API request fails.
         """
-        response = self.client.get(f"/v1/projects/{project_id}/tasks")
+        response = self.client.get(
+            f"/v1/projects/{project_id}/tasks",
+            headers=self._get_auth_headers(),
+        )
         response.raise_for_status()
         data = response.json()
 
@@ -170,6 +193,7 @@ class BambooHRClient:
         response = self.client.get(
             f"/v1/employees/{employee_id}/timesheets",
             params=params,
+            headers=self._get_auth_headers(),
         )
         response.raise_for_status()
         data = response.json()
@@ -196,6 +220,7 @@ class BambooHRClient:
         response = self.client.post(
             f"/v1/employees/{entry.employee_id}/timesheets",
             json=payload,
+            headers=self._get_auth_headers(),
         )
         response.raise_for_status()
         result = response.json()
@@ -217,6 +242,7 @@ class BambooHRClient:
         response = self.client.put(
             f"/v1/timesheets/{entry_id}",
             json=payload,
+            headers=self._get_auth_headers(),
         )
         response.raise_for_status()
 
@@ -229,7 +255,10 @@ class BambooHRClient:
         Raises:
             httpx.HTTPError: If API request fails.
         """
-        response = self.client.delete(f"/v1/timesheets/{entry_id}")
+        response = self.client.delete(
+            f"/v1/timesheets/{entry_id}",
+            headers=self._get_auth_headers(),
+        )
         response.raise_for_status()
 
     def close(self) -> None:

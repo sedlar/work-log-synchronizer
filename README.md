@@ -16,7 +16,8 @@ A command-line tool to synchronize work logs from Clockify to BambooHR timesheet
 
 - Python 3.13+
 - Clockify API key
-- BambooHR API key and subdomain
+- BambooHR OAuth 2.0 credentials (Client ID and Client Secret)
+- BambooHR subdomain
 
 ## Installation
 
@@ -46,9 +47,13 @@ uv run work-log-sync configure
 
 This will:
 - Prompt for your Clockify API key
-- Prompt for your BambooHR API key and subdomain
+- Prompt for your BambooHR OAuth Client ID and Client Secret
+- Prompt for your BambooHR subdomain
+- Open your browser for BambooHR OAuth authorization
 - Test the connections
-- Save credentials to `~/.work-log-sync/tokens.json`
+- Save credentials to `~/.work-log-sync/state.json` and `~/.work-log-sync/tokens.json`
+
+**Note:** The OAuth flow will open your default browser for authorization. If you're running remotely, ensure you can access the authorization URL or use the local callback mechanism.
 
 ### 2. Sync Work Logs
 
@@ -161,6 +166,9 @@ work-log-synchronizer/
 │   ├── config.py           # Configuration management
 │   ├── clockify/           # Clockify API client
 │   ├── bamboohr/           # BambooHR API client
+│   │   ├── client.py       # BambooHRClient class
+│   │   ├── models.py       # Pydantic models for BambooHR
+│   │   └── oauth.py        # OAuth 2.0 authentication
 │   ├── sync/               # Synchronization engine
 │   └── utils/              # Utilities (storage, logging)
 ├── tests/                  # Test suite
@@ -174,14 +182,15 @@ work-log-synchronizer/
 
 1. **CLI (cli.py)**: Typer-based command-line interface
 2. **API Clients**:
-   - `ClockifyClient`: Handles Clockify API communication
-   - `BambooHRClient`: Handles BambooHR API communication
+   - `ClockifyClient`: Handles Clockify API communication with API keys
+   - `BambooHRClient`: Handles BambooHR API communication with OAuth tokens
+   - `BambooHROAuthClient`: Manages BambooHR OAuth 2.0 flow (authorization, token refresh)
 3. **Sync Engine**: Core synchronization logic
    - `SyncEngine`: Orchestrates the sync process
    - `TaskMapper`: Interactive mapping management
 4. **Configuration**:
    - `Config`: Configuration management
-   - `StorageManager`: Persistent storage for state and tokens
+   - `StorageManager`: Persistent storage for state, tokens, and OAuth credentials
 
 ### Sync Flow
 
@@ -203,18 +212,46 @@ work-log-synchronizer/
 2. Click on "API" in the left sidebar
 3. Copy your API key
 
-### BambooHR API Key
+### BambooHR OAuth 2.0 Credentials
 
-1. Go to BambooHR Settings (as admin)
-2. Navigate to "API Keys"
-3. Create or copy your API key
-4. Note your subdomain (from URL: `https://yourcompany.bamboohr.com`)
+As of April 14, 2025, BambooHR requires OAuth 2.0 authentication for new applications. Here's how to set up your OAuth credentials:
+
+1. **Register your application:**
+   - Visit [developers.bamboohr.com](https://developers.bamboohr.com)
+   - Register your organization if not already done
+   - Click "Create Application"
+   - Provide an application name
+
+2. **Configure application settings:**
+   - In the application details, find the "OAuth Redirect URI" section
+   - Set the redirect URI to: `http://localhost:8000/callback`
+   - Select the required scopes (at minimum: `employees:read`, `timesheets:write`, `projects:read`, `offline_access`)
+   - Save the application
+
+3. **Obtain credentials:**
+   - In the "Credentials" section, copy:
+     - **Client ID**: Your OAuth Client ID
+     - **Client Secret**: Your OAuth Client Secret
+   - Keep these secure!
+
+4. **Get your subdomain:**
+   - Your BambooHR domain is the subdomain in your URL: `https://yourcompany.bamboohr.com`
+   - In this example, your subdomain is `yourcompany`
+
+5. **Use during configuration:**
+   - When running `work-log-sync configure`, enter these credentials
+   - The tool will automatically open your browser for authorization
+   - Grant the necessary permissions
 
 ## Troubleshooting
 
-### "API key not found"
+### "OAuth credentials not configured" or "BambooHR not configured"
 
-Ensure you've run `work-log-sync configure` and your credentials are saved correctly.
+Ensure you've run `work-log-sync configure` and your OAuth credentials are saved correctly. Check that your Client ID and Client Secret are valid.
+
+### Browser does not open during configuration
+
+If the browser doesn't automatically open during OAuth authentication, the tool will display the authorization URL. Copy and paste it into your browser manually.
 
 ### Duplicate entries
 

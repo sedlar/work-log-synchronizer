@@ -131,3 +131,13 @@ class StorageManager:
         tokens = self.load_tokens()
         tokens[service] = token
         self.save_tokens(tokens)
+
+    def delete_token(self, service: str) -> None:
+        """Delete token for a service.
+
+        Args:
+            service: Service name.
+        """
+        tokens = self.load_tokens()
+        tokens.pop(service, None)
+        self.save_tokens(tokens)

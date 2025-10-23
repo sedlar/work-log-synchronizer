@@ -7,6 +7,11 @@ from work_log_sync.bamboohr.models import (
     BambooTask,
     BambooTimeEntry,
 )
+from work_log_sync.bamboohr.oauth import (
+    BambooHROAuthClient,
+    BambooHROAuthConfig,
+    OAuthToken,
+)
 
 __all__ = [
     "BambooHRClient",
@@ -14,4 +19,7 @@ __all__ = [
     "BambooTask",
     "BambooTimeEntry",
     "BambooEmployee",
+    "BambooHROAuthClient",
+    "BambooHROAuthConfig",
+    "OAuthToken",
 ]

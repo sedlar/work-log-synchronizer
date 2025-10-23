@@ -13,6 +13,7 @@ from rich.table import Table
 
 from work_log_sync import __version__
 from work_log_sync.bamboohr import BambooHRClient
+from work_log_sync.bamboohr.oauth import BambooHROAuthConfig, BambooHROAuthClient
 from work_log_sync.clockify import ClockifyClient
 from work_log_sync.config import Config
 from work_log_sync.sync import SyncEngine
@@ -95,17 +96,31 @@ def sync(
             raise typer.Exit(code=1)
 
         bamboohr_domain = storage.load_state().get("bamboohr_domain")
-        bamboohr_key = storage.get_token("bamboohr")
-        if not bamboohr_domain or not bamboohr_key:
+        if not bamboohr_domain:
             console.print("[yellow]BambooHR not configured. Please configure it first.[/yellow]")
             console.print("Run: work-log-sync configure")
             raise typer.Exit(code=1)
 
-        with ClockifyClient(api_key=clockify_key, storage=storage) as clockify_client, BambooHRClient(
+        # Initialize BambooHR OAuth client
+        oauth_config = BambooHROAuthConfig(
+            client_id=storage.load_state().get("bamboohr_client_id", ""),
+            client_secret=storage.load_state().get("bamboohr_client_secret", ""),
             domain=bamboohr_domain,
-            api_key=bamboohr_key,
+        )
+
+        if not oauth_config.client_id or not oauth_config.client_secret:
+            console.print("[yellow]BambooHR OAuth credentials not configured.[/yellow]")
+            console.print("Run: work-log-sync configure")
+            raise typer.Exit(code=1)
+
+        oauth_client = BambooHROAuthClient(oauth_config, storage=storage)
+        bamboohr_client = BambooHRClient(
+            domain=bamboohr_domain,
+            oauth_client=oauth_client,
             storage=storage,
-        ) as bamboohr_client:
+        )
+
+        with ClockifyClient(api_key=clockify_key, storage=storage) as clockify_client, bamboohr_client:
             engine = SyncEngine(
                 config=config,
                 clockify_client=clockify_client,
@@ -179,19 +194,41 @@ def configure(
     console.print("[green]✓ Clockify API key saved[/green]")
 
     # BambooHR setup
-    console.print("\n[yellow]BambooHR Configuration[/yellow]")
+    console.print("\n[yellow]BambooHR Configuration (OAuth 2.0)[/yellow]")
     bamboohr_domain = Prompt.ask("Enter your BambooHR subdomain (e.g., 'mycompany')")
-    bamboohr_key = Prompt.ask(
-        "Enter your BambooHR API key",
+    bamboohr_client_id = Prompt.ask(
+        "Enter your BambooHR OAuth Client ID",
+        password=False,
+    )
+    bamboohr_client_secret = Prompt.ask(
+        "Enter your BambooHR OAuth Client Secret",
         password=True,
     )
 
-    storage.set_token("bamboohr", bamboohr_key)
+    # Save OAuth credentials
     state = storage.load_state()
     state["bamboohr_domain"] = bamboohr_domain
+    state["bamboohr_client_id"] = bamboohr_client_id
+    state["bamboohr_client_secret"] = bamboohr_client_secret
     storage.save_state(state)
 
-    console.print("[green]✓ BambooHR configuration saved[/green]")
+    console.print("[cyan]Initializing OAuth authentication...[/cyan]")
+
+    # Create OAuth config and initiate authentication
+    oauth_config = BambooHROAuthConfig(
+        client_id=bamboohr_client_id,
+        client_secret=bamboohr_client_secret,
+        domain=bamboohr_domain,
+    )
+
+    try:
+        oauth_client = BambooHROAuthClient(oauth_config, storage=storage)
+        console.print("[cyan]Opening browser for BambooHR authorization...[/cyan]")
+        token = oauth_client.handle_callback()
+        console.print("[green]✓ BambooHR OAuth authentication successful[/green]")
+    except Exception as e:
+        console.print(f"[red]✗ BambooHR authentication failed: {e}[/red]")
+        raise typer.Exit(code=1)
 
     # Test connections
     console.print("\n[cyan]Testing connections...[/cyan]")
@@ -203,13 +240,13 @@ def configure(
         console.print(f"[red]✗ Failed to connect to Clockify: {e}[/red]")
 
     try:
-        with BambooHRClient(
+        bamboohr_client = BambooHRClient(
             domain=bamboohr_domain,
-            api_key=bamboohr_key,
+            oauth_client=oauth_client,
             storage=storage,
-        ) as bamboohr_client:
-            projects = bamboohr_client.list_projects()
-            console.print(f"[green]✓ Connected to BambooHR (found {len(projects)} projects)[/green]")
+        )
+        projects = bamboohr_client.list_projects()
+        console.print(f"[green]✓ Connected to BambooHR (found {len(projects)} projects)[/green]")
     except Exception as e:
         console.print(f"[red]✗ Failed to connect to BambooHR: {e}[/red]")
 
