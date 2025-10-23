@@ -1,0 +1,38 @@
+# Example project/task mapping configuration for work-log-sync
+#
+# This file maps Clockify projects/tasks to BambooHR projects/tasks
+# Location: ~/.work-log-sync/mapping.yaml
+#
+# Keys are in format: "Project Name" or "Project Name:Task Name"
+# Values can be:
+#   - bamboo_project_id and bamboo_task_id: Maps to a BambooHR project/task
+#   - skip: true: Ignores this entry (not synced)
+
+projects:
+  # Map Clockify "Development:Backend" to BambooHR project 1, task 101
+  "Development:Backend":
+    bamboo_project_id: "1"
+    bamboo_task_id: "101"
+
+  # Map Clockify "Development:Frontend" to BambooHR project 1, task 102
+  "Development:Frontend":
+    bamboo_project_id: "1"
+    bamboo_task_id: "102"
+
+  # Map Clockify "Support:Bug Fixes" to BambooHR project 2, task 201
+  "Support:Bug Fixes":
+    bamboo_project_id: "2"
+    bamboo_task_id: "201"
+
+  # Skip syncing Clockify "Internal:Meetings"
+  "Internal:Meetings":
+    skip: true
+
+  # Skip syncing Clockify "Break"
+  "Break":
+    skip: true
+
+  # Project-level mapping (applies to all tasks in the project if not overridden)
+  "Training":
+    bamboo_project_id: "3"
+    bamboo_task_id: "301"
