@@ -69,8 +69,8 @@ def sample_clockify_time_entry(
         timeInterval={
             "start": now.isoformat() + "Z",
             "end": (now + timedelta(hours=2)).isoformat() + "Z",
+            "duration": "PT2H",
         },
-        duration=2 * 60 * 60 * 1000,  # 2 hours in milliseconds
         userId="user_123",
         workspaceId="workspace_123",
     )

@@ -17,8 +17,6 @@ logger = logging.getLogger(__name__)
 class BambooHRClient:
     """Client for BambooHR API."""
 
-    BASE_URL = "https://api.bamboohr.com/api"
-
     def __init__(
         self,
         domain: str,
@@ -37,16 +35,16 @@ class BambooHRClient:
         Raises:
             ValueError: If oauth_client is not provided.
         """
-        self.domain = domain
         self.storage = storage or StorageManager()
         self.oauth_client = oauth_client
 
         if not oauth_client:
             raise ValueError("BambooHROAuthClient is required for authentication")
 
+        url = f"https://{domain}.bamboohr.com/api"
         if confirm:
             self.client = create_confirming_client(
-                base_url=f"{self.BASE_URL}/{domain}",
+                base_url=url,
                 headers={
                     "Accept": "application/json",
                 },
@@ -54,7 +52,7 @@ class BambooHRClient:
             )
         else:
             self.client = httpx.Client(
-                base_url=f"{self.BASE_URL}/{domain}",
+                base_url=url,
                 headers={
                     "Accept": "application/json",
                 },

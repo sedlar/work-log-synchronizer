@@ -103,8 +103,8 @@ class SyncEngine:
 
         try:
             # Get current user info
-            user_id = self.clockify.get_user_id()
             user_info = self.clockify.get_current_user()
+            user_id = user_info["id"]
             workspace_id = user_info["defaultWorkspace"]
 
             # Get Clockify entries

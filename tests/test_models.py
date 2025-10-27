@@ -36,8 +36,8 @@ class TestClockifyModels:
             timeInterval={
                 "start": now.isoformat() + "Z",
                 "end": end.isoformat() + "Z",
+                "duration": "PT2H",
             },
-            duration=2 * 60 * 60 * 1000,
             userId="user_123",
             workspaceId="ws_123",
         )
@@ -56,8 +56,8 @@ class TestClockifyModels:
             timeInterval={
                 "start": now.isoformat() + "Z",
                 "end": (now + timedelta(hours=1)).isoformat() + "Z",
+                "duration": "PT1H",
             },
-            duration=60 * 60 * 1000,
             userId="user_123",
             workspaceId="ws_123",
         )
