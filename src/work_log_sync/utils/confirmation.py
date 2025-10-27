@@ -160,6 +160,9 @@ class ConfirmationTransport(httpx.BaseTransport):
         console.print("[bold green]✓ Proceeding with API call[/bold green]\n")
         response = self.transport.handle_request(request)
 
+        # Read the response to consume the stream before accessing content
+        response.read()
+
         # Display response details
         console.print("=" * 80)
         console.print(f"[bold blue]API Response[/bold blue]")

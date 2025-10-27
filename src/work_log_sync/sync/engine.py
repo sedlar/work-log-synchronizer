@@ -105,7 +105,7 @@ class SyncEngine:
             # Get current user info
             user_id = self.clockify.get_user_id()
             user_info = self.clockify.get_current_user()
-            workspace_id = user_info["defaultWorkspaceId"]
+            workspace_id = user_info["defaultWorkspace"]
 
             # Get Clockify entries
             start_datetime = datetime.combine(from_date, datetime.min.time())

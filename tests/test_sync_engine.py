@@ -90,7 +90,7 @@ class TestSyncEngine:
         mock_clockify.get_user_id.return_value = "user_123"
         mock_clockify.get_current_user.return_value = {
             "id": "user_123",
-            "defaultWorkspaceId": "ws_123",
+            "defaultWorkspace": "ws_123",
         }
         mock_clockify.get_time_entries.return_value = []
         mock_clockify.list_projects.return_value = []
@@ -143,7 +143,7 @@ class TestSyncEngine:
         mock_clockify.get_user_id.return_value = "user_123"
         mock_clockify.get_current_user.return_value = {
             "id": "user_123",
-            "defaultWorkspaceId": "ws_123",
+            "defaultWorkspace": "ws_123",
         }
         mock_clockify.get_time_entries.return_value = []
         mock_clockify.list_projects.return_value = []
