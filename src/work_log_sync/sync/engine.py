@@ -134,13 +134,13 @@ class SyncEngine:
                 except Exception as e:
                     logger.warning(f"Failed to fetch tasks for project {proj.id}: {e}")
 
-            # Get BambooHR employee info
-            bamboo_employees = self.bamboohr.get_employees()
-            bamboo_employee = next(
-                (e for e in bamboo_employees), None
-            )  # Sync for current user
-            if not bamboo_employee:
-                result.add_failure("No BambooHR employee found")
+            # Get BambooHR employee info for current authenticated user
+            # Using ID 0 returns the employee associated with the current OAuth token
+            try:
+                bamboo_employee = self.bamboohr.get_employee(0)
+            except Exception as e:
+                logger.error(f"Failed to get current employee info: {e}")
+                result.add_failure(f"Could not retrieve employee information: {e}")
                 return result
 
             employee_id = bamboo_employee.id

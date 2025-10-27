@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 class BambooHRClient:
     """Client for BambooHR API."""
 
-    BASE_URL = "https://api.bamboohr.com/api/gateway.php"
+    BASE_URL = "https://api.bamboohr.com/api"
 
     def __init__(
         self,
