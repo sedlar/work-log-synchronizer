@@ -8,6 +8,7 @@ import httpx
 
 from work_log_sync.clockify.models import ClockifyProject, ClockifyTask, ClockifyTimeEntry
 from work_log_sync.utils import StorageManager
+from work_log_sync.utils.confirmation import create_confirming_client
 
 logger = logging.getLogger(__name__)
 
@@ -17,12 +18,18 @@ class ClockifyClient:
 
     BASE_URL = "https://api.clockify.me/api/v1"
 
-    def __init__(self, api_key: str | None = None, storage: StorageManager | None = None) -> None:
+    def __init__(
+        self,
+        api_key: str | None = None,
+        storage: StorageManager | None = None,
+        confirm: bool = False,
+    ) -> None:
         """Initialize Clockify client.
 
         Args:
             api_key: Clockify API key. If None, will try to load from storage.
             storage: StorageManager instance for token caching.
+            confirm: If True, prompt for confirmation before each API call.
         """
         self.storage = storage or StorageManager()
         self.api_key = api_key or self.storage.get_token("clockify")
@@ -30,11 +37,18 @@ class ClockifyClient:
         if not self.api_key:
             raise ValueError("Clockify API key not provided or found in storage")
 
-        self.client = httpx.Client(
-            base_url=self.BASE_URL,
-            headers={"X-Api-Key": self.api_key},
-            timeout=30.0,
-        )
+        if confirm:
+            self.client = create_confirming_client(
+                base_url=self.BASE_URL,
+                headers={"X-Api-Key": self.api_key},
+                timeout=30.0,
+            )
+        else:
+            self.client = httpx.Client(
+                base_url=self.BASE_URL,
+                headers={"X-Api-Key": self.api_key},
+                timeout=30.0,
+            )
 
     def get_current_user(self) -> dict[str, Any]:
         """Get current authenticated user.

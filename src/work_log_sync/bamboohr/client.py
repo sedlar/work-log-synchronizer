@@ -9,6 +9,7 @@ import httpx
 from work_log_sync.bamboohr.models import BambooEmployee, BambooProject, BambooTask, BambooTimeEntry
 from work_log_sync.bamboohr.oauth import BambooHROAuthClient, OAuthToken
 from work_log_sync.utils import StorageManager
+from work_log_sync.utils.confirmation import create_confirming_client
 
 logger = logging.getLogger(__name__)
 
@@ -23,6 +24,7 @@ class BambooHRClient:
         domain: str,
         oauth_client: BambooHROAuthClient | None = None,
         storage: StorageManager | None = None,
+        confirm: bool = False,
     ) -> None:
         """Initialize BambooHR client with OAuth authentication.
 
@@ -30,6 +32,7 @@ class BambooHRClient:
             domain: BambooHR domain/subdomain (e.g., 'mycompany').
             oauth_client: BambooHROAuthClient instance for OAuth authentication.
             storage: StorageManager instance for token caching.
+            confirm: If True, prompt for confirmation before each API call.
 
         Raises:
             ValueError: If oauth_client is not provided.
@@ -41,13 +44,22 @@ class BambooHRClient:
         if not oauth_client:
             raise ValueError("BambooHROAuthClient is required for authentication")
 
-        self.client = httpx.Client(
-            base_url=f"{self.BASE_URL}/{domain}",
-            headers={
-                "Accept": "application/json",
-            },
-            timeout=30.0,
-        )
+        if confirm:
+            self.client = create_confirming_client(
+                base_url=f"{self.BASE_URL}/{domain}",
+                headers={
+                    "Accept": "application/json",
+                },
+                timeout=30.0,
+            )
+        else:
+            self.client = httpx.Client(
+                base_url=f"{self.BASE_URL}/{domain}",
+                headers={
+                    "Accept": "application/json",
+                },
+                timeout=30.0,
+            )
 
     def _get_auth_headers(self) -> dict[str, str]:
         """Get authorization headers with current OAuth token.

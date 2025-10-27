@@ -6,6 +6,7 @@ from datetime import date, datetime
 from pathlib import Path
 from typing import Optional
 
+import httpx
 import typer
 from rich.console import Console
 from rich.prompt import Prompt
@@ -51,6 +52,11 @@ def sync(
         "--verbose",
         "-v",
         help="Enable verbose logging.",
+    ),
+    confirm: bool = typer.Option(
+        False,
+        "--confirm",
+        help="Print each API call and prompt for confirmation before sending.",
     ),
     config_dir: Optional[Path] = typer.Option(
         None,
@@ -118,9 +124,10 @@ def sync(
             domain=bamboohr_domain,
             oauth_client=oauth_client,
             storage=storage,
+            confirm=confirm,
         )
 
-        with ClockifyClient(api_key=clockify_key, storage=storage) as clockify_client, bamboohr_client:
+        with ClockifyClient(api_key=clockify_key, storage=storage, confirm=confirm) as clockify_client, bamboohr_client:
             engine = SyncEngine(
                 config=config,
                 clockify_client=clockify_client,
@@ -161,6 +168,14 @@ def sync(
             exit_code = 0 if result.entries_failed == 0 else 1
             raise typer.Exit(code=exit_code)
 
+    except httpx.RequestError as e:
+        if "cancelled by user" in str(e).lower():
+            console.print("[yellow]Sync cancelled by user[/yellow]")
+            raise typer.Exit(code=0)
+        else:
+            logger.error(f"API request failed: {e}", exc_info=True)
+            console.print(f"[red]Error: API request failed: {e}[/red]")
+            raise typer.Exit(code=1)
     except Exception as e:
         logger.error(f"Sync failed: {e}", exc_info=True)
         console.print(f"[red]Error: {e}[/red]")
