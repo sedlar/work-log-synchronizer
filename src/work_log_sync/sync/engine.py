@@ -120,19 +120,9 @@ class SyncEngine:
 
             logger.info(f"Found {len(clockify_entries)} Clockify time entries")
 
-            # Get projects and tasks for mapping
+            # Get projects for mapping
             projects = self.clockify.list_projects(workspace_id)
             project_map = {p.id: p for p in projects}
-
-            # Get BambooHR data
-            bamboo_projects = self.bamboohr.list_projects()
-            bamboo_tasks: dict[str, list[Any]] = {}
-            for proj in bamboo_projects:
-                try:
-                    tasks = self.bamboohr.list_project_tasks(proj.id)
-                    bamboo_tasks[str(proj.id)] = tasks
-                except Exception as e:
-                    logger.warning(f"Failed to fetch tasks for project {proj.id}: {e}")
 
             # Get BambooHR employee info for current authenticated user
             # Using ID 0 returns the employee associated with the current OAuth token
@@ -162,11 +152,8 @@ class SyncEngine:
                 try:
                     self._sync_entry(
                         entry=entry,
-                        workspace_id=workspace_id,
                         employee_id=employee_id,
                         project_map=project_map,
-                        bamboo_projects=bamboo_projects,
-                        bamboo_tasks=bamboo_tasks,
                         existing_keys=existing_keys,
                         result=result,
                         dry_run=dry_run,
@@ -191,11 +178,8 @@ class SyncEngine:
     def _sync_entry(
         self,
         entry: ClockifyTimeEntry,
-        workspace_id: str,
         employee_id: str | int,
         project_map: dict[str, Any],
-        bamboo_projects: list[Any],
-        bamboo_tasks: dict[str, list[Any]],
         existing_keys: set[tuple[Any, ...]],
         result: SyncResult,
         dry_run: bool = False,
@@ -208,8 +192,6 @@ class SyncEngine:
             workspace_id: Clockify workspace ID.
             employee_id: BambooHR employee ID.
             project_map: Map of project ID to project name.
-            bamboo_projects: List of BambooHR projects.
-            bamboo_tasks: Dictionary of project tasks.
             existing_keys: Set of existing entry keys for duplicate detection.
             result: Sync result object.
             dry_run: If True, don't actually create entries.
@@ -245,11 +227,7 @@ class SyncEngine:
         mapping = self.config.get_mapping_for(mapping_key)
         if not mapping and interactive:
             # Prompt for mapping
-            mapping = self.mapper.prompt_for_mapping(
-                mapping_key,
-                bamboo_projects,
-                bamboo_tasks,
-            )
+            mapping = self.mapper.prompt_for_mapping(mapping_key)
             if mapping:
                 self.mapper.save_mapping(mapping_key, mapping)
             else:
@@ -264,7 +242,8 @@ class SyncEngine:
         bamboo_project_id = mapping.get("bamboo_project_id")
         bamboo_task_id = mapping.get("bamboo_task_id")
 
-        if not bamboo_project_id or not bamboo_task_id:
+        # Project ID is required, but task ID is optional
+        if not bamboo_project_id:
             result.add_unmapped(mapping_key)
             return
 

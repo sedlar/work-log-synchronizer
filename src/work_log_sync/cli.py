@@ -361,20 +361,22 @@ def mapping(
 
     table = Table(title="Project/Task Mappings")
     table.add_column("Clockify", style="cyan")
-    table.add_column("BambooHR Project", style="magenta")
-    table.add_column("BambooHR Task", style="magenta")
+    table.add_column("BambooHR", style="magenta")
     table.add_column("Action", style="yellow")
 
     for clockify_key, mapping_data in projects.items():
         if mapping_data.get("skip"):
-            table.add_row(clockify_key, "-", "-", "SKIP")
+            table.add_row(clockify_key, "-", "SKIP")
         else:
-            table.add_row(
-                clockify_key,
-                mapping_data.get("bamboo_project_id", "-"),
-                mapping_data.get("bamboo_task_id", "-"),
-                "SYNC",
-            )
+            project_id = mapping_data.get("bamboo_project_id", "?")
+            task_id = mapping_data.get("bamboo_task_id")
+            name = mapping_data.get("bamboo_name", "?")
+
+            # Display: friendly name (project_id/task_id)
+            task_info = f"/{task_id}" if task_id else ""
+            bamboo_info = f"{name} ({project_id}{task_info})"
+
+            table.add_row(clockify_key, bamboo_info, "SYNC")
 
     console.print(table)
 

@@ -51,6 +51,14 @@ class Config:
         projects = self._mapping.get("projects", {})
         return projects.get(clockify_key)
 
+    def get_all_mappings(self) -> dict[str, dict[str, Any]]:
+        """Get all current mappings.
+
+        Returns:
+            Dictionary of all project mappings (clockify_key -> mapping_dict).
+        """
+        return self._mapping.get("projects", {})
+
     def should_skip(self, clockify_key: str) -> bool:
         """Check if a Clockify project/task should be skipped.
 

@@ -7,7 +7,6 @@ from rich.console import Console
 from rich.prompt import Prompt
 from rich.table import Table
 
-from work_log_sync.bamboohr.models import BambooProject, BambooTask
 from work_log_sync.config import Config
 
 logger = logging.getLogger(__name__)
@@ -54,96 +53,131 @@ class TaskMapper:
         """
         return not self.config.is_mapped(clockify_key)
 
-    def prompt_for_mapping(
-        self,
-        clockify_key: str,
-        bamboo_projects: list[BambooProject],
-        all_tasks: dict[str, list[BambooTask]],
-    ) -> dict[str, Any] | None:
+    def prompt_for_mapping(self, clockify_key: str) -> dict[str, Any] | None:
         """Interactively prompt user to map a Clockify project/task.
+
+        User can enter a new mapping, select from existing mappings, or skip.
 
         Args:
             clockify_key: Clockify project/task key.
-            bamboo_projects: List of available BambooHR projects.
-            all_tasks: Dictionary of project_id -> list of tasks.
 
         Returns:
-            Mapping dictionary or None if user wants to skip.
+            Mapping dictionary with bamboo_project_id, bamboo_task_id, and bamboo_name,
+            or {"skip": True} if user wants to skip,
+            or None if user cancels.
         """
         console.print(f"\n[yellow]Unmapped Clockify entry: {clockify_key}[/yellow]")
 
-        # Display available projects
-        table = Table(title="Available BambooHR Projects")
-        table.add_column("Index", style="cyan")
-        table.add_column("Project", style="magenta")
+        # Show options
+        options = ["Enter new mapping", "Select from existing", "Skip this entry"]
+        for idx, option in enumerate(options, 1):
+            console.print(f"  {idx}. {option}")
 
-        for idx, project in enumerate(bamboo_projects, 1):
-            table.add_row(str(idx), project.name)
-
-        # Add skip option
-        table.add_row(str(len(bamboo_projects) + 1), "[bold red]Skip this entry[/bold red]")
-
-        console.print(table)
-
-        # Get project selection
-        max_idx = len(bamboo_projects) + 1
         while True:
             try:
                 choice = Prompt.ask(
-                    f"Select project (1-{max_idx})",
-                    choices=[str(i) for i in range(1, max_idx + 1)],
+                    "Choose an option",
+                    choices=["1", "2", "3"],
                 )
-                project_idx = int(choice) - 1
+                choice_idx = int(choice) - 1
                 break
             except (ValueError, IndexError):
                 console.print("[red]Invalid choice, please try again[/red]")
                 continue
 
-        # Handle skip
-        if project_idx >= len(bamboo_projects):
+        if choice_idx == 2:  # Skip
             return {"skip": True}
+        elif choice_idx == 1:  # Select from existing
+            return self._select_existing_mapping()
+        else:  # Enter new
+            return self._prompt_for_new_mapping()
 
-        selected_project = bamboo_projects[project_idx]
-        logger.info(f"Selected BambooHR project: {selected_project.name}")
+    def _select_existing_mapping(self) -> dict[str, Any] | None:
+        """Show existing mappings and let user select one.
 
-        # Get tasks for selected project
-        project_tasks = all_tasks.get(str(selected_project.id), [])
+        Returns:
+            Selected mapping dictionary or None if user cancels.
+        """
+        existing_mappings = self.config.get_all_mappings()
 
-        if not project_tasks:
-            console.print(f"[yellow]No tasks found for project {selected_project.name}[/yellow]")
+        if not existing_mappings:
+            console.print("[yellow]No existing mappings found[/yellow]")
             return None
 
-        # Display available tasks
-        table = Table(title="Available Tasks")
+        # Display existing mappings
+        table = Table(title="Existing Mappings")
         table.add_column("Index", style="cyan")
-        table.add_column("Task", style="magenta")
+        table.add_column("Clockify Entry", style="magenta")
+        table.add_column("BambooHR", style="green")
 
-        for idx, task in enumerate(project_tasks, 1):
-            table.add_row(str(idx), task.name)
+        for idx, (key, mapping) in enumerate(existing_mappings.items(), 1):
+            if mapping.get("skip"):
+                bamboo_info = "[red]SKIP[/red]"
+            else:
+                project_id = mapping.get("bamboo_project_id", "?")
+                task_id = mapping.get("bamboo_task_id")
+                task_info = f"/{task_id}" if task_id else ""
+                name = mapping.get("bamboo_name", "?")
+                bamboo_info = f"{name} ({project_id}{task_info})"
+
+            table.add_row(str(idx), key, bamboo_info)
 
         console.print(table)
 
-        # Get task selection
+        # Get selection
+        max_idx = len(existing_mappings)
         while True:
             try:
                 choice = Prompt.ask(
-                    f"Select task (1-{len(project_tasks)})",
-                    choices=[str(i) for i in range(1, len(project_tasks) + 1)],
+                    f"Select mapping (1-{max_idx})",
+                    choices=[str(i) for i in range(1, max_idx + 1)],
                 )
-                task_idx = int(choice) - 1
+                selected_idx = int(choice) - 1
                 break
             except (ValueError, IndexError):
                 console.print("[red]Invalid choice, please try again[/red]")
                 continue
 
-        selected_task = project_tasks[task_idx]
-        logger.info(f"Selected BambooHR task: {selected_task.name}")
+        # Get the selected mapping
+        selected_key = list(existing_mappings.keys())[selected_idx]
+        selected_mapping = existing_mappings[selected_key]
+        logger.info(f"Selected existing mapping: {selected_key}")
+
+        return selected_mapping
+
+    def _prompt_for_new_mapping(self) -> dict[str, Any]:
+        """Prompt user to enter new BambooHR project/task details.
+
+        Returns:
+            Mapping dictionary with bamboo_project_id, bamboo_task_id, and bamboo_name.
+        """
+        console.print("\n[cyan]Enter BambooHR project/task details:[/cyan]")
+
+        # Get project ID
+        while True:
+            project_id = Prompt.ask("BambooHR Project ID (required)")
+            if project_id.strip():
+                break
+            console.print("[red]Project ID is required[/red]")
+
+        # Get task ID (optional)
+        task_id_input = Prompt.ask("BambooHR Task ID (optional, press Enter to skip)")
+        task_id = task_id_input.strip() if task_id_input.strip() else None
+
+        # Get display name
+        while True:
+            name = Prompt.ask("Friendly name for this project/task (required)")
+            if name.strip():
+                break
+            console.print("[red]Name is required[/red]")
 
         mapping = {
-            "bamboo_project_id": str(selected_project.id),
-            "bamboo_task_id": str(selected_task.id),
+            "bamboo_project_id": project_id.strip(),
+            "bamboo_task_id": task_id,
+            "bamboo_name": name.strip(),
         }
 
+        logger.info(f"Created new mapping: {mapping}")
         return mapping
 
     def save_mapping(self, clockify_key: str, mapping: dict[str, Any]) -> None:

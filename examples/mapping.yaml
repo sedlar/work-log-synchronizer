@@ -5,7 +5,7 @@
 #
 # Keys are in format: "Project Name" or "Project Name:Task Name"
 # Values can be:
-#   - bamboo_project_id and bamboo_task_id: Maps to a BambooHR project/task
+#   - bamboo_project_id, bamboo_task_id (optional), and bamboo_name: Maps to a BambooHR project/task
 #   - skip: true: Ignores this entry (not synced)
 
 projects:
@@ -13,16 +13,24 @@ projects:
   "Development:Backend":
     bamboo_project_id: "1"
     bamboo_task_id: "101"
+    bamboo_name: "Backend Development"
 
   # Map Clockify "Development:Frontend" to BambooHR project 1, task 102
   "Development:Frontend":
     bamboo_project_id: "1"
     bamboo_task_id: "102"
+    bamboo_name: "Frontend Development"
 
   # Map Clockify "Support:Bug Fixes" to BambooHR project 2, task 201
   "Support:Bug Fixes":
     bamboo_project_id: "2"
     bamboo_task_id: "201"
+    bamboo_name: "Support - Bug Fixes"
+
+  # Map Clockify "Research" to BambooHR project 4 (no task ID)
+  "Research":
+    bamboo_project_id: "4"
+    bamboo_name: "Research Project"
 
   # Skip syncing Clockify "Internal:Meetings"
   "Internal:Meetings":
@@ -36,3 +44,4 @@ projects:
   "Training":
     bamboo_project_id: "3"
     bamboo_task_id: "301"
+    bamboo_name: "Training Course"
