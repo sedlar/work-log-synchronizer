@@ -158,7 +158,43 @@ class ConfirmationTransport(httpx.BaseTransport):
 
         # Proceed with actual request
         console.print("[bold green]✓ Proceeding with API call[/bold green]\n")
-        return self.transport.handle_request(request)
+        response = self.transport.handle_request(request)
+
+        # Display response details
+        console.print("=" * 80)
+        console.print(f"[bold blue]API Response[/bold blue]")
+        console.print("=" * 80)
+
+        # Show status code
+        status_style = "green" if response.status_code < 400 else "red"
+        console.print(f"[bold {status_style}]Status Code:[/bold {status_style}] {response.status_code}")
+
+        # Show response headers (redacted)
+        if response.headers:
+            redacted_headers = _redact_headers(dict(response.headers))
+            table = Table(title="Headers", show_header=True, header_style="bold magenta")
+            table.add_column("Key", style="cyan")
+            table.add_column("Value", style="green")
+
+            for key, value in redacted_headers.items():
+                table.add_row(key, value)
+
+            console.print(table)
+
+        # Show response body if present
+        if response.content:
+            body_str = _format_payload(response.content)
+            console.print(f"\n[bold cyan]Body:[/bold cyan]")
+            if body_str.startswith("{"):
+                # Format as syntax-highlighted JSON
+                syntax = Syntax(body_str, "json", theme="monokai", line_numbers=False)
+                console.print(syntax)
+            else:
+                console.print(body_str)
+
+        console.print("=" * 80 + "\n")
+
+        return response
 
 
 def create_confirming_client(
