@@ -3,19 +3,17 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "work-log-synchronizer"
+name = "clockify-export"
 version = "0.1.0"
-description = "Synchronize work logs from Clockify to BambooHR timesheet"
+description = "Export Clockify time entries to BambooHR-ready JSON"
 readme = "README.md"
 requires-python = ">=3.13"
 license = {text = "MIT"}
-authors = [{name = "Work Log Sync"}]
+authors = [{name = "Clockify Export"}]
 dependencies = [
-    "typer[all]~=0.14.0",
+    "click~=8.1.0",
     "httpx~=0.27.0",
-    "authlib~=1.6.0",
     "pydantic~=2.10.0",
-    "pydantic-settings~=2.5.0",
     "pyyaml~=6.0.2",
     "python-dateutil~=2.8.0",
     "rich~=13.9.0",
@@ -25,7 +23,6 @@ dependencies = [
 dev = [
     "pytest~=8.0.2",
     "pytest-cov~=4.1.0",
-    "pytest-asyncio~=0.23.3",
     "ruff~=0.6.9",
     "mypy~=1.13.0",
     "types-PyYAML~=6.0.0",
@@ -33,10 +30,10 @@ dev = [
 ]
 
 [project.scripts]
-work-log-sync = "work_log_sync.cli:main"
+clockify-export = "clockify_export.cli:main"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/work_log_sync"]
+packages = ["src/clockify_export"]
 
 [tool.ruff]
 line-length = 100
@@ -58,7 +55,7 @@ ignore = [
 ]
 
 [tool.ruff.lint.isort]
-known-first-party = ["work_log_sync"]
+known-first-party = ["clockify_export"]
 
 [tool.ruff.format]
 quote-style = "double"
@@ -82,4 +79,4 @@ ignore_errors = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "--cov=src/work_log_sync --cov-report=html --cov-report=term-missing"
+addopts = "--cov=src/clockify_export --cov-report=html --cov-report=term-missing"

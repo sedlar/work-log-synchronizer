@@ -1,11 +1,9 @@
-"""Tests for storage manager."""
+# ABOUTME: Tests for StorageManager config/mapping persistence.
+# ABOUTME: Validates YAML loading, saving, and default values.
 
-from datetime import datetime, timedelta
 from pathlib import Path
 
-import pytest
-
-from work_log_sync.utils import StorageManager
+from clockify_export.utils import StorageManager
 
 
 class TestStorageManager:
@@ -17,84 +15,52 @@ class TestStorageManager:
         storage = StorageManager(temp_config_dir)
         assert storage.config_dir == temp_config_dir
 
+    def test_config_persistence(self, storage_manager: StorageManager) -> None:
+        """Test saving and loading config."""
+        config = {
+            "clockify": {
+                "api_key": "test-key",
+                "workspace_id": "ws-123",
+            }
+        }
+        storage_manager.save_config(config)
+        loaded = storage_manager.load_config()
+        assert loaded == config
+
+    def test_get_api_key(self, storage_manager: StorageManager) -> None:
+        """Test getting API key from config."""
+        storage_manager.save_config({"clockify": {"api_key": "my-key", "workspace_id": "ws"}})
+        assert storage_manager.get_api_key() == "my-key"
+
+    def test_get_api_key_missing(self, storage_manager: StorageManager) -> None:
+        """Test getting API key when not configured."""
+        assert storage_manager.get_api_key() is None
+
+    def test_get_workspace_id(self, storage_manager: StorageManager) -> None:
+        """Test getting workspace ID from config."""
+        storage_manager.save_config({"clockify": {"api_key": "k", "workspace_id": "ws-456"}})
+        assert storage_manager.get_workspace_id() == "ws-456"
+
     def test_mapping_persistence(self, storage_manager: StorageManager) -> None:
         """Test saving and loading mappings."""
         mapping = {
-            "projects": {
-                "project_1:task_1": {
-                    "bamboo_project_id": "1",
-                    "bamboo_task_id": "101",
+            "mappings": [
+                {
+                    "clockify_project": "Project Alpha",
+                    "clockify_task": "Development",
+                    "bamboo_project_id": 10,
+                    "bamboo_task_id": 24,
                 }
-            }
+            ]
         }
-
         storage_manager.save_mapping(mapping)
         loaded = storage_manager.load_mapping()
-
         assert loaded == mapping
 
-    def test_state_persistence(self, storage_manager: StorageManager) -> None:
-        """Test saving and loading state."""
-        state = {
-            "last_sync_date": "2024-01-01T12:00:00",
-            "last_sync_count": 5,
-        }
-
-        storage_manager.save_state(state)
-        loaded = storage_manager.load_state()
-
-        assert loaded == state
-
-    def test_token_persistence(self, storage_manager: StorageManager) -> None:
-        """Test saving and loading tokens."""
-        tokens = {
-            "clockify": "test_clockify_key",
-            "bamboohr": "test_bamboohr_key",
-        }
-
-        storage_manager.save_tokens(tokens)
-        loaded = storage_manager.load_tokens()
-
-        assert loaded == tokens
-
-    def test_get_set_token(self, storage_manager: StorageManager) -> None:
-        """Test getting and setting individual tokens."""
-        storage_manager.set_token("clockify", "my_api_key")
-        token = storage_manager.get_token("clockify")
-
-        assert token == "my_api_key"
-
-    def test_get_nonexistent_token(self, storage_manager: StorageManager) -> None:
-        """Test getting a token that doesn't exist."""
-        token = storage_manager.get_token("nonexistent")
-        assert token is None
-
-    def test_last_sync_date(self, storage_manager: StorageManager) -> None:
-        """Test getting and setting last sync date."""
-        now = datetime.now()
-        storage_manager.set_last_sync_date(now)
-
-        loaded = storage_manager.get_last_sync_date()
-        assert loaded is not None
-        # Allow for small time differences due to microseconds
-        assert abs((loaded - now).total_seconds()) < 1
-
-    def test_last_sync_date_none(self, storage_manager: StorageManager) -> None:
-        """Test getting last sync date when not set."""
-        last_sync = storage_manager.get_last_sync_date()
-        assert last_sync is None
+    def test_empty_config_default(self, storage_manager: StorageManager) -> None:
+        """Test that loading non-existent config returns empty dict."""
+        assert storage_manager.load_config() == {}
 
     def test_empty_mapping_default(self, storage_manager: StorageManager) -> None:
         """Test that loading non-existent mapping returns empty dict."""
-        mapping = storage_manager.load_mapping()
-        assert mapping == {}
-
-    def test_empty_state_default(self, storage_manager: StorageManager) -> None:
-        """Test that loading non-existent state returns empty dict."""
-        state = storage_manager.load_state()
-        assert state == {}
-
-    def test_empty_tokens_default(self, storage_manager: StorageManager) -> None:
-        """Test that loading non-existent tokens returns empty dict."""
-        tokens = storage_manager.load_tokens()
-        assert tokens == {}
+        assert storage_manager.load_mapping() == {}

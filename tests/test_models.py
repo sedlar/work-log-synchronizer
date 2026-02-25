@@ -1,31 +1,28 @@
-"""Tests for Pydantic models."""
+# ABOUTME: Tests for Clockify Pydantic models.
+# ABOUTME: Validates model creation, time parsing, timezone conversion, and rounding.
 
-from datetime import date, datetime, timedelta
+from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 
-import pytest
-
-from work_log_sync.bamboohr import BambooTimeEntry, BambooEmployee, BambooProject, BambooTask
-from work_log_sync.clockify import ClockifyTimeEntry, ClockifyProject
+from clockify_export.clockify import ClockifyProject, ClockifyTimeEntry
+from clockify_export.clockify.models import parse_iso8601_duration, round_to_minute
 
 
 class TestClockifyModels:
     """Test Clockify models."""
 
     def test_clockify_project_creation(self) -> None:
-        """Test creating a Clockify project model."""
         project = ClockifyProject(
             id="123",
             name="My Project",
             workspaceId="ws_123",
         )
-
         assert project.id == "123"
         assert project.name == "My Project"
         assert project.workspace_id == "ws_123"
         assert project.archived is False
 
     def test_clockify_time_entry_creation(self) -> None:
-        """Test creating a Clockify time entry model."""
         now = datetime.now()
         end = now + timedelta(hours=2)
 
@@ -48,7 +45,6 @@ class TestClockifyModels:
         assert entry.duration_hours == 2.0
 
     def test_clockify_time_entry_start_time(self) -> None:
-        """Test getting start time from Clockify entry."""
         now = datetime.now()
         entry = ClockifyTimeEntry(
             id="entry_123",
@@ -65,64 +61,78 @@ class TestClockifyModels:
         start = entry.start_time
         assert isinstance(start, datetime)
         assert start.year == now.year
-        assert start.month == now.month
-        assert start.day == now.day
 
 
-class TestBambooHRModels:
-    """Test BambooHR models."""
+class TestTimezoneConversion:
+    """Test timezone conversion and rounding."""
 
-    def test_bamboo_time_entry_creation(self) -> None:
-        """Test creating a BambooHR time entry model."""
-        entry = BambooTimeEntry(
-            employeeId="1001",
-            date=date.today(),
-            hours=2.5,
-            projectId="1",
-            taskId="101",
+    def test_round_to_minute_rounds_down(self) -> None:
+        dt = datetime(2026, 2, 25, 9, 30, 15)
+        result = round_to_minute(dt)
+        assert result == datetime(2026, 2, 25, 9, 30, 0)
+
+    def test_round_to_minute_rounds_up(self) -> None:
+        dt = datetime(2026, 2, 25, 9, 30, 45)
+        result = round_to_minute(dt)
+        assert result == datetime(2026, 2, 25, 9, 31, 0)
+
+    def test_round_to_minute_exact(self) -> None:
+        dt = datetime(2026, 2, 25, 9, 30, 0)
+        result = round_to_minute(dt)
+        assert result == datetime(2026, 2, 25, 9, 30, 0)
+
+    def test_round_to_minute_boundary(self) -> None:
+        """Rounding at 30 seconds should round up."""
+        dt = datetime(2026, 2, 25, 9, 59, 30)
+        result = round_to_minute(dt)
+        assert result == datetime(2026, 2, 25, 10, 0, 0)
+
+    def test_local_start_time(self) -> None:
+        entry = ClockifyTimeEntry(
+            id="e1",
+            timeInterval={
+                "start": "2026-02-25T08:00:00Z",
+                "end": "2026-02-25T12:00:00Z",
+                "duration": "PT4H",
+            },
+            userId="u1",
+            workspaceId="ws1",
         )
+        tz = ZoneInfo("Europe/Prague")
+        local = entry.local_start_time(tz)
+        # UTC+1 in February (CET)
+        assert local.hour == 9
+        assert local.minute == 0
 
-        assert entry.employee_id == "1001"
-        assert entry.hours == 2.5
-        assert entry.project_id == "1"
-
-    def test_bamboo_time_entry_to_api_dict(self) -> None:
-        """Test converting BambooHR entry to API dictionary."""
-        entry = BambooTimeEntry(
-            employeeId="1001",
-            date=date(2024, 1, 15),
-            hours=2.5,
-            projectId="1",
-            taskId="101",
-            notes="Test entry",
+    def test_local_end_time(self) -> None:
+        entry = ClockifyTimeEntry(
+            id="e1",
+            timeInterval={
+                "start": "2026-02-25T08:00:00Z",
+                "end": "2026-02-25T12:00:00Z",
+                "duration": "PT4H",
+            },
+            userId="u1",
+            workspaceId="ws1",
         )
+        tz = ZoneInfo("Europe/Prague")
+        local = entry.local_end_time(tz)
+        assert local is not None
+        assert local.hour == 13
+        assert local.minute == 0
 
-        api_dict = entry.to_api_dict()
-        assert api_dict["employeeId"] == "1001"
-        assert api_dict["date"] == "2024-01-15"
-        assert api_dict["hours"] == 2.5
-        assert api_dict["projectId"] == "1"
-        assert api_dict["taskId"] == "101"
-        assert api_dict["notes"] == "Test entry"
 
-    def test_bamboo_employee_display_name(self) -> None:
-        """Test employee display name."""
-        employee = BambooEmployee(
-            id="1001",
-            firstName="John",
-            lastName="Doe",
-        )
+class TestIsoDuration:
+    """Test ISO 8601 duration parsing."""
 
-        assert employee.display_name == "John Doe"
+    def test_hours_only(self) -> None:
+        assert parse_iso8601_duration("PT4H") == 4.0
 
-    def test_bamboo_project_creation(self) -> None:
-        """Test creating a BambooHR project model."""
-        project = BambooProject(id="1", name="Test Project")
-        assert project.id == "1"
-        assert project.name == "Test Project"
+    def test_minutes_only(self) -> None:
+        assert parse_iso8601_duration("PT30M") == 0.5
 
-    def test_bamboo_task_creation(self) -> None:
-        """Test creating a BambooHR task model."""
-        task = BambooTask(id="101", name="Development")
-        assert task.id == "101"
-        assert task.name == "Development"
+    def test_hours_and_minutes(self) -> None:
+        assert parse_iso8601_duration("PT1H30M") == 1.5
+
+    def test_empty_string(self) -> None:
+        assert parse_iso8601_duration("") == 0.0

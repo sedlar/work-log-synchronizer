@@ -1,18 +1,15 @@
-"""Pytest configuration and fixtures."""
+# ABOUTME: Pytest configuration and shared fixtures.
+# ABOUTME: Provides temporary config dirs and sample Clockify objects.
 
-import json
 import tempfile
-from datetime import date, datetime, timedelta
+from datetime import datetime, timedelta
 from pathlib import Path
-from unittest.mock import MagicMock
 
 import pytest
 
-from work_log_sync.bamboohr import BambooProject, BambooTask, BambooTimeEntry, BambooEmployee
-from work_log_sync.bamboohr.oauth import BambooHROAuthClient, BambooHROAuthConfig, OAuthToken
-from work_log_sync.clockify import ClockifyProject, ClockifyTask, ClockifyTimeEntry
-from work_log_sync.config import Config
-from work_log_sync.utils import StorageManager
+from clockify_export.clockify import ClockifyProject, ClockifyTask, ClockifyTimeEntry
+from clockify_export.config import MappingConfig
+from clockify_export.utils import StorageManager
 
 
 @pytest.fixture
@@ -29,9 +26,9 @@ def storage_manager(temp_config_dir: Path) -> StorageManager:
 
 
 @pytest.fixture
-def config(temp_config_dir: Path) -> Config:
-    """Create a config instance with temporary directory."""
-    return Config(temp_config_dir)
+def mapping_config(temp_config_dir: Path) -> MappingConfig:
+    """Create a mapping config with temporary directory."""
+    return MappingConfig(temp_config_dir)
 
 
 @pytest.fixture
@@ -74,79 +71,3 @@ def sample_clockify_time_entry(
         userId="user_123",
         workspaceId="workspace_123",
     )
-
-
-@pytest.fixture
-def sample_bamboo_project() -> BambooProject:
-    """Create a sample BambooHR project."""
-    return BambooProject(
-        id="1",
-        name="Test Project",
-    )
-
-
-@pytest.fixture
-def sample_bamboo_task(sample_bamboo_project: BambooProject) -> BambooTask:
-    """Create a sample BambooHR task."""
-    return BambooTask(
-        id="101",
-        name="Development",
-    )
-
-
-@pytest.fixture
-def sample_bamboo_employee() -> BambooEmployee:
-    """Create a sample BambooHR employee."""
-    return BambooEmployee(
-        id="1001",
-        firstName="John",
-        lastName="Doe",
-        email="john.doe@example.com",
-    )
-
-
-@pytest.fixture
-def sample_bamboo_time_entry(
-    sample_bamboo_employee: BambooEmployee,
-    sample_bamboo_project: BambooProject,
-    sample_bamboo_task: BambooTask,
-) -> BambooTimeEntry:
-    """Create a sample BambooHR time entry."""
-    return BambooTimeEntry(
-        id="10001",
-        employeeId=sample_bamboo_employee.id,
-        date=date.today(),
-        hours=2.0,
-        projectId=sample_bamboo_project.id,
-        taskId=sample_bamboo_task.id,
-        notes="Working on feature X",
-    )
-
-
-@pytest.fixture
-def oauth_config() -> BambooHROAuthConfig:
-    """Create a sample BambooHR OAuth configuration."""
-    return BambooHROAuthConfig(
-        client_id="test_client_id",
-        client_secret="test_client_secret",
-        domain="testcompany",
-    )
-
-
-@pytest.fixture
-def oauth_token() -> OAuthToken:
-    """Create a sample OAuth token."""
-    return OAuthToken(
-        access_token="test_access_token",
-        refresh_token="test_refresh_token",
-        expires_in=3600,
-    )
-
-
-@pytest.fixture
-def mock_oauth_client(oauth_config: BambooHROAuthConfig, oauth_token: OAuthToken) -> MagicMock:
-    """Create a mock BambooHROAuthClient."""
-    mock_client = MagicMock(spec=BambooHROAuthClient)
-    mock_client.get_token.return_value = oauth_token
-    mock_client.config = oauth_config
-    return mock_client

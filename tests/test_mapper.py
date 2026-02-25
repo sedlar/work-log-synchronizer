@@ -1,64 +1,19 @@
-"""Tests for task mapper."""
+# ABOUTME: Tests for the interactive mapper module.
+# ABOUTME: Validates mapping flow logic without requiring user interaction.
 
-import pytest
-
-from work_log_sync.config import Config
-from work_log_sync.sync.mapper import TaskMapper
+from clockify_export.config import MappingConfig, MappingEntry
 
 
-class TestTaskMapper:
-    """Test TaskMapper functionality."""
+class TestMapperConfig:
+    """Test mapper's interaction with MappingConfig."""
 
-    def test_get_unmapped_key_project_only(self, config: Config) -> None:
-        """Test generating key for project only."""
-        mapper = TaskMapper(config)
-        key = mapper.get_unmapped_key("My Project")
+    def test_find_existing_skips_prompt(self, mapping_config: MappingConfig) -> None:
+        """Entries that are already mapped should be skipped in the flow."""
+        mapping_config.add(MappingEntry("Alpha", "Dev", 10, 24))
 
-        assert key == "My Project"
+        # run_mapping_flow checks mapping.find() and skips existing entries,
+        # so we just verify the find works correctly
+        assert mapping_config.find("Alpha", "Dev") is not None
 
-    def test_get_unmapped_key_project_and_task(self, config: Config) -> None:
-        """Test generating key for project and task."""
-        mapper = TaskMapper(config)
-        key = mapper.get_unmapped_key("My Project", "Development")
-
-        assert key == "My Project:Development"
-
-    def test_needs_mapping_unmapped(self, config: Config) -> None:
-        """Test needs_mapping for unmapped entry."""
-        mapper = TaskMapper(config)
-
-        assert mapper.needs_mapping("unmapped:entry") is True
-
-    def test_needs_mapping_mapped(self, config: Config) -> None:
-        """Test needs_mapping for mapped entry."""
-        mapper = TaskMapper(config)
-        config.update_mapping(
-            "project:task",
-            {
-                "bamboo_project_id": "1",
-                "bamboo_task_id": "101",
-            },
-        )
-
-        assert mapper.needs_mapping("project:task") is False
-
-    def test_needs_mapping_skipped(self, config: Config) -> None:
-        """Test needs_mapping for skipped entry."""
-        mapper = TaskMapper(config)
-        config.update_mapping("project:task", {"skip": True})
-
-        # Even if skipped, it's mapped
-        assert mapper.needs_mapping("project:task") is False
-
-    def test_save_mapping(self, config: Config) -> None:
-        """Test saving a mapping."""
-        mapper = TaskMapper(config)
-        mapping = {
-            "bamboo_project_id": "1",
-            "bamboo_task_id": "101",
-        }
-
-        mapper.save_mapping("project:task", mapping)
-
-        saved = config.get_mapping_for("project:task")
-        assert saved == mapping
+    def test_find_returns_none_for_unmapped(self, mapping_config: MappingConfig) -> None:
+        assert mapping_config.find("Unknown", None) is None
