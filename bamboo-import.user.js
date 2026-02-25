@@ -402,8 +402,6 @@
       const text = await response.text();
       throw new Error(`HTTP ${response.status}: ${text}`);
     }
-
-    return response.json();
   }
 
   // --- Init ---
