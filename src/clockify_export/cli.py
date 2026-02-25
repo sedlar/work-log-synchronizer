@@ -222,7 +222,7 @@ def export(from_date: datetime, to_date: datetime, output: Path | None, config_d
 
     # Summary to stderr so it doesn't pollute JSON stdout
     if not output:
-        console.print(f"\n[green]Exported {len(result.entries)} entries.[/green]", stderr=True)
+        Console(stderr=True).print(f"\n[green]Exported {len(result.entries)} entries.[/green]")
 
 
 def main() -> None:
