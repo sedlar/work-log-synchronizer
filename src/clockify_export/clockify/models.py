@@ -78,7 +78,7 @@ class ClockifyTask(BaseModel):
 class ClockifyTimeEntry(BaseModel):
     """Clockify time entry model."""
 
-    model_config = ConfigDict(populate_by_name=True)
+    model_config = ConfigDict(populate_by_name=True, extra="ignore")
 
     id: str
     description: str | None = None
@@ -89,12 +89,6 @@ class ClockifyTimeEntry(BaseModel):
     project_id: str | None = Field(default=None, alias="projectId")
     workspace_id: str = Field(alias="workspaceId")
     time_interval: dict[str, str] = Field(alias="timeInterval")
-    custom_field_values: list = Field(default_factory=list, alias="customFieldValues")
-    type: str = "REGULAR"
-    kiosk_id: str | None = Field(default=None, alias="kioskId")
-    hourly_rate: float | None = Field(default=None, alias="hourlyRate")
-    cost_rate: float | None = Field(default=None, alias="costRate")
-    is_locked: bool = Field(default=False, alias="isLocked")
 
     @property
     def start_time(self) -> datetime:
