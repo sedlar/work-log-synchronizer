@@ -4,7 +4,7 @@
 // ==UserScript==
 // @name         BambooHR Clockify Import
 // @namespace    clockify-bamboo-sync
-// @version      1.0
+// @version      2.0
 // @description  Import time entries from Clockify export into BambooHR timesheet
 // @match        https://*.bamboohr.com/employees/timesheet*
 // @grant        none
@@ -82,22 +82,13 @@
     return h * 60 + m;
   }
 
-  function rangesOverlap(s1, e1, s2, e2) {
-    return s1 < e2 && s2 < e1;
-  }
-
-  function validateEntry(entry, timesheetDates, projects, data) {
+  function validateAggregatedEntry(entry, timesheetDates, projects, data) {
     const errors = [];
     const warnings = [];
 
     // Check date in timesheet period
     if (!timesheetDates.includes(entry.date)) {
       errors.push('Date outside timesheet period');
-    }
-
-    // Check start < end
-    if (entry.start >= entry.end) {
-      errors.push('Start time must be before end time');
     }
 
     // Check project exists
@@ -113,35 +104,49 @@
       }
     }
 
-    // Check overlaps with existing entries
+    // Check for existing entries with the same date/project/task
     if (errors.length === 0) {
       const existing = getExistingEntries(data, entry.date);
-      const entryStart = timeToMinutes(entry.start);
-      const entryEnd = timeToMinutes(entry.end);
-
       for (const ex of existing) {
-        // hourEntries have hours but no start/end - can't check overlap precisely
-        // clockEntries have start/end
-        if (ex.start && ex.end) {
-          const exStart = timeToMinutes(ex.start);
-          const exEnd = timeToMinutes(ex.end);
-          if (rangesOverlap(entryStart, entryEnd, exStart, exEnd)) {
-            warnings.push('Overlaps with existing entry');
-            break;
-          }
+        if (ex.projectId === entry.projectId && (ex.taskId ?? null) === (entry.taskId ?? null)) {
+          warnings.push('Date already has entries for this project/task');
+          break;
         }
-      }
-
-      // If there are hourEntries (no start/end), warn if the date already has entries
-      const day = data?.timesheet?.dailyDetails?.[entry.date];
-      if (day && day.hourEntries?.length > 0) {
-        warnings.push('Date already has hour entries');
       }
     }
 
     if (errors.length > 0) return { status: 'invalid', icon: '\u274C', messages: errors };
     if (warnings.length > 0) return { status: 'warning', icon: '\u26A0\uFE0F', messages: warnings };
     return { status: 'ready', icon: '\u2705', messages: ['Ready'] };
+  }
+
+  // --- Aggregation ---
+
+  function computeHours(entry) {
+    const startMinutes = timeToMinutes(entry.start);
+    const endMinutes = timeToMinutes(entry.end);
+    return (endMinutes - startMinutes) / 60;
+  }
+
+  function aggregateEntries(entries) {
+    const groups = new Map();
+    for (const entry of entries) {
+      const key = `${entry.date}|${entry.projectId}|${entry.taskId ?? ''}`;
+      if (!groups.has(key)) {
+        groups.set(key, {
+          date: entry.date,
+          projectId: entry.projectId,
+          taskId: entry.taskId ?? null,
+          hours: 0,
+          sources: [],
+        });
+      }
+      const group = groups.get(key);
+      const h = computeHours(entry);
+      group.hours += h;
+      group.sources.push(`${entry.start}-${entry.end}`);
+    }
+    return Array.from(groups.values());
   }
 
   // --- UI creation ---
@@ -321,33 +326,35 @@
 
   // --- Preview logic ---
 
-  function renderPreview(entries, validations, projects) {
+  function renderPreview(aggregated, validations, projects) {
     const readyCount = validations.filter(v => v.status === 'ready').length;
     const warnCount = validations.filter(v => v.status === 'warning').length;
     const invalidCount = validations.filter(v => v.status === 'invalid').length;
 
     let html = '<table class="ci-table"><thead><tr>';
-    html += '<th>Date</th><th>Time</th><th>Project</th><th>Status</th>';
+    html += '<th>Date</th><th>Hours</th><th>Project</th><th>Status</th>';
     html += '</tr></thead><tbody>';
 
-    for (let i = 0; i < entries.length; i++) {
-      const e = entries[i];
+    for (let i = 0; i < aggregated.length; i++) {
+      const e = aggregated[i];
       const v = validations[i];
       const projName = getProjectName(projects, e.projectId) || `#${e.projectId}`;
       const taskName = getTaskName(projects, e.projectId, e.taskId);
       const projDisplay = taskName ? `${projName} / ${taskName}` : projName;
       const datePart = e.date.substring(5); // MM-DD
+      const hoursDisplay = `${e.hours.toFixed(2)}h`;
+      const timeDetail = e.sources.join(', ');
 
       html += `<tr>`;
       html += `<td>${datePart}</td>`;
-      html += `<td>${e.start}-${e.end}</td>`;
-      html += `<td title="${e.note || ''}">${projDisplay}</td>`;
+      html += `<td title="${timeDetail}">${hoursDisplay}</td>`;
+      html += `<td>${projDisplay}</td>`;
       html += `<td class="ci-status-${v.status}" title="${v.messages.join(', ')}">${v.icon}</td>`;
       html += `</tr>`;
     }
 
     html += '</tbody></table>';
-    html += `<div class="ci-summary">${entries.length} entries (${readyCount} ready`;
+    html += `<div class="ci-summary">${aggregated.length} entries (${readyCount} ready`;
     if (warnCount > 0) html += `, ${warnCount} warning`;
     if (invalidCount > 0) html += `, ${invalidCount} invalid`;
     html += ')</div>';
@@ -368,26 +375,25 @@
 
   // --- Import logic ---
 
-  async function importEntries(entries, employeeId, csrfToken) {
+  async function importEntries(aggregatedEntries, employeeId, csrfToken) {
     const body = {
-      entries: entries.map((e, i) => ({
+      hours: aggregatedEntries.map((e, i) => ({
         id: null,
-        trackingId: i + 1,
+        dailyEntryId: i + 1,
         employeeId: employeeId,
         date: e.date,
-        start: e.start,
-        end: e.end,
-        note: e.note || '',
+        hours: e.hours,
+        note: '',
         projectId: e.projectId,
         taskId: e.taskId ?? null,
       })),
     };
 
-    const response = await fetch('/timesheet/clock/entries', {
+    const response = await fetch('/timesheet/hour/entries', {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
-        'X-Csrf-Token': csrfToken,
+        'Content-Type': 'application/json;charset=utf-8',
+        'X-CSRF-TOKEN': csrfToken,
       },
       body: JSON.stringify(body),
     });
@@ -428,7 +434,7 @@
     const btnPreview = panel.querySelector('.ci-btn-preview');
     const btnClear = panel.querySelector('.ci-btn-clear');
 
-    let parsedEntries = [];
+    let aggregatedEntries = [];
     let validationResults = [];
 
     // Minimize/maximize
@@ -441,7 +447,7 @@
     btnClear.addEventListener('click', () => {
       textarea.value = '';
       previewArea.innerHTML = '';
-      parsedEntries = [];
+      aggregatedEntries = [];
       validationResults = [];
     });
 
@@ -462,10 +468,22 @@
         return;
       }
 
-      parsedEntries = entries;
-      validationResults = entries.map(e => validateEntry(e, timesheetDates, projects, pageData));
+      // Validate raw entries first (start < end check needs raw times)
+      const rawErrors = [];
+      for (const e of entries) {
+        if (e.start >= e.end) {
+          rawErrors.push(`${e.date} ${e.start}-${e.end}: Start time must be before end time`);
+        }
+      }
+      if (rawErrors.length > 0) {
+        previewArea.innerHTML = `<div class="ci-error">${rawErrors.join('<br>')}</div>`;
+        return;
+      }
 
-      previewArea.innerHTML = renderPreview(entries, validationResults, projects);
+      aggregatedEntries = aggregateEntries(entries);
+      validationResults = aggregatedEntries.map(e => validateAggregatedEntry(e, timesheetDates, projects, pageData));
+
+      previewArea.innerHTML = renderPreview(aggregatedEntries, validationResults, projects);
 
       // Bind import buttons
       const btnImportReady = previewArea.querySelector('.ci-btn-import-ready');
@@ -473,7 +491,7 @@
       const resultArea = previewArea.querySelector('.ci-result-area');
 
       async function doImport(includeWarnings) {
-        const toImport = parsedEntries.filter((_, i) => {
+        const toImport = aggregatedEntries.filter((_, i) => {
           const s = validationResults[i].status;
           return s === 'ready' || (includeWarnings && s === 'warning');
         });
