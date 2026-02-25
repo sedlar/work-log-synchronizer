@@ -316,6 +316,7 @@
         <div class="ci-actions">
           <button class="ci-btn ci-btn-primary ci-btn-preview">Preview</button>
           <button class="ci-btn ci-btn-secondary ci-btn-clear">Clear</button>
+          <button class="ci-btn ci-btn-secondary ci-btn-extract">Extract Page Data</button>
         </div>
         <div class="ci-preview-area"></div>
       </div>
@@ -431,6 +432,7 @@
     const previewArea = panel.querySelector('.ci-preview-area');
     const btnPreview = panel.querySelector('.ci-btn-preview');
     const btnClear = panel.querySelector('.ci-btn-clear');
+    const btnExtract = panel.querySelector('.ci-btn-extract');
 
     let aggregatedEntries = [];
     let validationResults = [];
@@ -439,6 +441,18 @@
     header.addEventListener('click', () => {
       panel.classList.toggle('minimized');
       toggle.textContent = panel.classList.contains('minimized') ? '\u25B2' : '\u25BC';
+    });
+
+    // Extract page data
+    btnExtract.addEventListener('click', () => {
+      const el = document.getElementById('js-timesheet-data');
+      if (!el) {
+        previewArea.innerHTML = '<div class="ci-error">No #js-timesheet-data found</div>';
+        return;
+      }
+      textarea.value = el.textContent;
+      textarea.select();
+      previewArea.innerHTML = '<div class="ci-success">Page data extracted to textarea</div>';
     });
 
     // Clear
