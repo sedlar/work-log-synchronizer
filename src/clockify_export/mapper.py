@@ -31,7 +31,7 @@ def run_mapping_flow(
         label = f"{project_name}: {task_name}" if task_name else project_name
         console.print(f"\n[bold cyan]Mapping: {label}[/bold cyan]")
 
-        action = Prompt.ask("  [s]kip / [m]ap", choices=["s", "m"], default="m")
+        action = Prompt.ask("  [bright_cyan]s[/bright_cyan]kip / [bright_cyan]m[/bright_cyan]ap", choices=["s", "m"], default="m")
         if action == "s":
             continue
 
@@ -53,8 +53,8 @@ def _prompt_with_menu(
     """Prompt user to select from numbered BambooHR project/task list."""
     # Show project menu
     table = Table(title="BambooHR Projects")
-    table.add_column("#", style="cyan")
-    table.add_column("Project", style="white")
+    table.add_column("#", style="bright_cyan")
+    table.add_column("Project")
     for i, proj in enumerate(bamboo_projects, 1):
         table.add_row(str(i), proj.name)
     console.print(table)
@@ -69,8 +69,8 @@ def _prompt_with_menu(
 
     if selected_project.tasks:
         task_table = Table(title=f"Tasks for {selected_project.name}")
-        task_table.add_column("#", style="cyan")
-        task_table.add_column("Task", style="white")
+        task_table.add_column("#", style="bright_cyan")
+        task_table.add_column("Task")
         for i, task in enumerate(selected_project.tasks, 1):
             task_table.add_row(str(i), task.name)
         console.print(task_table)
