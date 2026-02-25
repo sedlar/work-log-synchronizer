@@ -349,7 +349,7 @@
       html += `<td>${datePart}</td>`;
       html += `<td title="${timeDetail}">${hoursDisplay}</td>`;
       html += `<td>${projDisplay}</td>`;
-      html += `<td class="ci-status-${v.status}" title="${v.messages.join(', ')}">${v.icon}</td>`;
+      html += `<td class="ci-status-${v.status}">${v.icon} ${v.messages.join('; ')}</td>`;
       html += `</tr>`;
     }
 
