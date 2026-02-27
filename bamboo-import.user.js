@@ -355,7 +355,8 @@
     }
 
     html += '</tbody></table>';
-    html += `<div class="ci-summary">${aggregated.length} entries (${readyCount} ready`;
+    const totalHours = aggregated.reduce((sum, e) => sum + e.hours, 0);
+    html += `<div class="ci-summary">${totalHours.toFixed(2)}h total \u2014 ${aggregated.length} entries (${readyCount} ready`;
     if (warnCount > 0) html += `, ${warnCount} warning`;
     if (invalidCount > 0) html += `, ${invalidCount} invalid`;
     html += ')</div>';
