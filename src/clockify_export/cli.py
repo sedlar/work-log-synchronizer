@@ -2,15 +2,13 @@
 # ABOUTME: Provides setup, init-mapping, and export commands.
 
 import json
-import logging
 import sys
-from datetime import date, datetime
+from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
 import click
 from rich.console import Console
-from rich.table import Table
 
 from clockify_export import __version__
 from clockify_export.bamboo_data import parse_timesheet_data
@@ -85,12 +83,18 @@ def setup(config_dir: Path | None) -> None:
         console.print(f"\n[green]Connected as {user.get('name', 'user')}[/green]")
     console.print(f"[green]Workspace: {selected['name']}[/green]")
     console.print("[green]Config saved.[/green]")
-    console.print("\nNext: run [bold]clockify-export init-mapping[/bold] to set up project/task mapping.")
+    console.print(
+        "\nNext: run [bold]clockify-export init-mapping[/bold] to set up project/task mapping."
+    )
 
 
 @cli.command("init-mapping")
-@click.option("--bamboo-data", type=click.Path(exists=True, path_type=Path), default=None,
-              help="Path to js-timesheet-data.json for BambooHR project/task menus.")
+@click.option(
+    "--bamboo-data",
+    type=click.Path(exists=True, path_type=Path),
+    default=None,
+    help="Path to js-timesheet-data.json for BambooHR project/task menus.",
+)
 @click.option("--config-dir", type=click.Path(path_type=Path), default=None)
 def init_mapping(bamboo_data: Path | None, config_dir: Path | None) -> None:
     """Build the project/task mapping interactively."""
@@ -136,18 +140,37 @@ def init_mapping(bamboo_data: Path | None, config_dir: Path | None) -> None:
     run_mapping_flow(clockify_pairs, mapping, bamboo_projects)
 
     console.print(f"\n[green]Mapping saved ({len(mapping.all_entries())} entries).[/green]")
-    console.print("Run [bold]clockify-export export --from YYYY-MM-DD --to YYYY-MM-DD[/bold] to export.")
+    console.print(
+        "Run [bold]clockify-export export --from YYYY-MM-DD --to YYYY-MM-DD[/bold] to export."
+    )
 
 
 @cli.command()
-@click.option("--from", "from_date", required=True, type=click.DateTime(formats=["%Y-%m-%d"]),
-              help="Start date (YYYY-MM-DD).")
-@click.option("--to", "to_date", required=True, type=click.DateTime(formats=["%Y-%m-%d"]),
-              help="End date (YYYY-MM-DD).")
-@click.option("-o", "--output", type=click.Path(path_type=Path), default=None,
-              help="Output file path. Defaults to stdout.")
+@click.option(
+    "--from",
+    "from_date",
+    required=True,
+    type=click.DateTime(formats=["%Y-%m-%d"]),
+    help="Start date (YYYY-MM-DD).",
+)
+@click.option(
+    "--to",
+    "to_date",
+    required=True,
+    type=click.DateTime(formats=["%Y-%m-%d"]),
+    help="End date (YYYY-MM-DD).",
+)
+@click.option(
+    "-o",
+    "--output",
+    type=click.Path(path_type=Path),
+    default=None,
+    help="Output file path. Defaults to stdout.",
+)
 @click.option("--config-dir", type=click.Path(path_type=Path), default=None)
-def export(from_date: datetime, to_date: datetime, output: Path | None, config_dir: Path | None) -> None:
+def export(
+    from_date: datetime, to_date: datetime, output: Path | None, config_dir: Path | None
+) -> None:
     """Export Clockify entries to BambooHR-ready JSON."""
     setup_logging(config_dir=config_dir)
     storage = StorageManager(config_dir)
@@ -160,7 +183,9 @@ def export(from_date: datetime, to_date: datetime, output: Path | None, config_d
 
     mapping = MappingConfig(config_dir)
     if not mapping.all_entries():
-        console.print("[red]No mappings configured. Run 'clockify-export init-mapping' first.[/red]")
+        console.print(
+            "[red]No mappings configured. Run 'clockify-export init-mapping' first.[/red]"
+        )
         sys.exit(1)
 
     from_dt = from_date.date() if isinstance(from_date, datetime) else from_date

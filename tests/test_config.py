@@ -21,22 +21,26 @@ class TestMappingEntry:
         assert d["bamboo_task_id"] == 24
 
     def test_from_dict(self) -> None:
-        entry = MappingEntry.from_dict({
-            "clockify_project": "Alpha",
-            "clockify_task": None,
-            "bamboo_project_id": 5,
-            "bamboo_task_id": None,
-        })
+        entry = MappingEntry.from_dict(
+            {
+                "clockify_project": "Alpha",
+                "clockify_task": None,
+                "bamboo_project_id": 5,
+                "bamboo_task_id": None,
+            }
+        )
         assert entry.clockify_project == "Alpha"
         assert entry.clockify_task is None
         assert entry.bamboo_project_id == 5
         assert entry.bamboo_task_id is None
 
     def test_from_dict_missing_task(self) -> None:
-        entry = MappingEntry.from_dict({
-            "clockify_project": "Alpha",
-            "bamboo_project_id": 5,
-        })
+        entry = MappingEntry.from_dict(
+            {
+                "clockify_project": "Alpha",
+                "bamboo_project_id": 5,
+            }
+        )
         assert entry.clockify_task is None
         assert entry.bamboo_task_id is None
 

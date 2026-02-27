@@ -62,9 +62,6 @@ def _parse_tasks(tasks_data: dict[str, Any]) -> list[BambooTask]:
     if isinstance(by_id, list):
         return []
 
-    tasks = [
-        BambooTask(id=task_data["id"], name=task_data["name"])
-        for task_data in by_id.values()
-    ]
+    tasks = [BambooTask(id=task_data["id"], name=task_data["name"]) for task_data in by_id.values()]
     tasks.sort(key=lambda t: t.name)
     return tasks

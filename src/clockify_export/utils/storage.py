@@ -34,12 +34,14 @@ class StorageManager:
     def get_api_key(self) -> str | None:
         """Get Clockify API key from config."""
         config = self.load_config()
-        return config.get("clockify", {}).get("api_key")
+        value: str | None = config.get("clockify", {}).get("api_key")
+        return value
 
     def get_workspace_id(self) -> str | None:
         """Get Clockify workspace ID from config."""
         config = self.load_config()
-        return config.get("clockify", {}).get("workspace_id")
+        value: str | None = config.get("clockify", {}).get("workspace_id")
+        return value
 
     def load_mapping(self) -> dict[str, Any]:
         """Load project/task mapping configuration."""

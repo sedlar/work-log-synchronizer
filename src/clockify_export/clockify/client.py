@@ -49,17 +49,20 @@ class ClockifyClient:
     def get_current_user(self) -> dict[str, Any]:
         """Get current authenticated user info."""
         response = self._request("GET", "/user")
-        return response.json()
+        result: dict[str, Any] = response.json()
+        return result
 
     def get_user_id(self) -> str:
         """Get current user's ID."""
         user = self.get_current_user()
-        return user["id"]
+        result: str = user["id"]
+        return result
 
     def list_workspaces(self) -> list[dict[str, Any]]:
         """List all workspaces the user has access to."""
         response = self._request("GET", "/workspaces")
-        return response.json()
+        result: list[dict[str, Any]] = response.json()
+        return result
 
     def list_projects(self, workspace_id: str) -> list[ClockifyProject]:
         """List all projects in a workspace (paginated)."""

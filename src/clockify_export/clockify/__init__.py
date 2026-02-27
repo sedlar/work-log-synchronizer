@@ -12,7 +12,7 @@ from clockify_export.clockify.models import (
 __all__ = [
     "ClockifyClient",
     "ClockifyProject",
+    "ClockifyTag",
     "ClockifyTask",
     "ClockifyTimeEntry",
-    "ClockifyTag",
 ]

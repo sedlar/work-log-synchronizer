@@ -7,7 +7,7 @@ from datetime import date, datetime
 from typing import Any
 from zoneinfo import ZoneInfo
 
-from clockify_export.clockify.models import ClockifyTimeEntry, round_to_minute
+from clockify_export.clockify.models import ClockifyTimeEntry
 from clockify_export.config import MappingConfig
 
 logger = logging.getLogger(__name__)
@@ -152,15 +152,11 @@ def _detect_overlaps(entries: list[ExportEntry]) -> list[str]:
                 continue
             # Overlap if a.start < b.end and b.start < a.end
             if a.start < b.end and b.start < a.end:
-                warnings.append(
-                    f"Overlap on {a.date}: {a.start}-{a.end} and {b.start}-{b.end}"
-                )
+                warnings.append(f"Overlap on {a.date}: {a.start}-{a.end} and {b.start}-{b.end}")
     return warnings
 
 
-def generate_json(
-    result: ExportResult, from_date: date, to_date: date
-) -> dict[str, Any]:
+def generate_json(result: ExportResult, from_date: date, to_date: date) -> dict[str, Any]:
     """Generate the final JSON output structure."""
     return {
         "metadata": {

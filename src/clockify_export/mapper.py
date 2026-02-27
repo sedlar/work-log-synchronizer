@@ -31,7 +31,11 @@ def run_mapping_flow(
         label = f"{project_name}: {task_name}" if task_name else project_name
         console.print(f"\n[bold cyan]Mapping: {label}[/bold cyan]")
 
-        action = Prompt.ask("  [bright_cyan]s[/bright_cyan]kip / [bright_cyan]m[/bright_cyan]ap", choices=["s", "m"], default="m")
+        action = Prompt.ask(
+            "  [bright_cyan]s[/bright_cyan]kip / [bright_cyan]m[/bright_cyan]ap",
+            choices=["s", "m"],
+            default="m",
+        )
         if action == "s":
             continue
 
@@ -87,9 +91,7 @@ def _prompt_with_menu(
     )
 
 
-def _prompt_raw_ids(
-    project_name: str, task_name: str | None
-) -> MappingEntry | None:
+def _prompt_raw_ids(project_name: str, task_name: str | None) -> MappingEntry | None:
     """Prompt user to enter BambooHR project/task IDs manually."""
     project_id_str = Prompt.ask("  BambooHR project ID")
     try:

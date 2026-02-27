@@ -45,9 +45,7 @@ class MappingConfig:
 
     def _load(self) -> None:
         data = self.storage.load_mapping()
-        self._entries = [
-            MappingEntry.from_dict(item) for item in data.get("mappings", [])
-        ]
+        self._entries = [MappingEntry.from_dict(item) for item in data.get("mappings", [])]
 
     def _save(self) -> None:
         data = {"mappings": [entry.to_dict() for entry in self._entries]}
@@ -69,9 +67,12 @@ class MappingConfig:
         """Add or update a mapping entry."""
         # Remove existing mapping for the same Clockify project/task pair
         self._entries = [
-            e for e in self._entries
-            if not (e.clockify_project == entry.clockify_project
-                    and e.clockify_task == entry.clockify_task)
+            e
+            for e in self._entries
+            if not (
+                e.clockify_project == entry.clockify_project
+                and e.clockify_task == entry.clockify_task
+            )
         ]
         self._entries.append(entry)
         self._save()

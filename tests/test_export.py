@@ -8,7 +8,7 @@ from zoneinfo import ZoneInfo
 
 from clockify_export.clockify.models import ClockifyTimeEntry
 from clockify_export.config import MappingConfig, MappingEntry
-from clockify_export.export import ExportEntry, build_export, generate_json, ExportResult
+from clockify_export.export import ExportEntry, ExportResult, build_export, generate_json
 
 
 def _make_entry(
@@ -46,7 +46,9 @@ class TestBuildExport:
         with tempfile.TemporaryDirectory() as tmpdir:
             mapping = _make_mapping(Path(tmpdir))
             entries = [
-                _make_entry("e1", "p1", "t1", "2026-02-25T08:00:00Z", "2026-02-25T12:00:00Z", "Work"),
+                _make_entry(
+                    "e1", "p1", "t1", "2026-02-25T08:00:00Z", "2026-02-25T12:00:00Z", "Work"
+                ),
             ]
             project_names = {"p1": "Project Alpha"}
             task_names = {"t1": "Development"}
@@ -70,7 +72,9 @@ class TestBuildExport:
             task_names = {"t1": "Development"}
 
             # CET = UTC+1
-            result = build_export(entries, project_names, task_names, mapping, ZoneInfo("Europe/Prague"))
+            result = build_export(
+                entries, project_names, task_names, mapping, ZoneInfo("Europe/Prague")
+            )
 
             assert result.entries[0].start == "09:00"
             assert result.entries[0].end == "13:00"
@@ -79,8 +83,12 @@ class TestBuildExport:
         with tempfile.TemporaryDirectory() as tmpdir:
             mapping = _make_mapping(Path(tmpdir))
             entries = [
-                _make_entry("e1", "p1", "t1", "2026-02-25T08:00:00Z", "2026-02-25T10:00:00Z", "Part 1"),
-                _make_entry("e2", "p1", "t1", "2026-02-25T10:00:00Z", "2026-02-25T12:00:00Z", "Part 2"),
+                _make_entry(
+                    "e1", "p1", "t1", "2026-02-25T08:00:00Z", "2026-02-25T10:00:00Z", "Part 1"
+                ),
+                _make_entry(
+                    "e2", "p1", "t1", "2026-02-25T10:00:00Z", "2026-02-25T12:00:00Z", "Part 2"
+                ),
             ]
             project_names = {"p1": "Project Alpha"}
             task_names = {"t1": "Development"}
@@ -125,7 +133,9 @@ class TestBuildExport:
         with tempfile.TemporaryDirectory() as tmpdir:
             mapping = _make_mapping(Path(tmpdir))
             entries = [
-                _make_entry("e1", "p_unknown", None, "2026-02-25T08:00:00Z", "2026-02-25T12:00:00Z"),
+                _make_entry(
+                    "e1", "p_unknown", None, "2026-02-25T08:00:00Z", "2026-02-25T12:00:00Z"
+                ),
             ]
             project_names = {"p_unknown": "Unknown Project"}
             task_names = {}

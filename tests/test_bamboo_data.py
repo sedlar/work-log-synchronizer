@@ -18,24 +18,31 @@ class TestParseTimesheetData:
         return Path(f.name)
 
     def test_parses_projects(self) -> None:
-        path = self._write_json({
-            "projectsWithTasks": {
-                "byId": {
-                    "5": {"id": 5, "name": "Administration", "tasks": {"byId": [], "allIds": []}},
-                    "9": {
-                        "id": 9, "name": "Development",
-                        "tasks": {
-                            "byId": {
-                                "15": {"id": 15, "name": "Content"},
-                                "16": {"id": 16, "name": "Brand"},
+        path = self._write_json(
+            {
+                "projectsWithTasks": {
+                    "byId": {
+                        "5": {
+                            "id": 5,
+                            "name": "Administration",
+                            "tasks": {"byId": [], "allIds": []},
+                        },
+                        "9": {
+                            "id": 9,
+                            "name": "Development",
+                            "tasks": {
+                                "byId": {
+                                    "15": {"id": 15, "name": "Content"},
+                                    "16": {"id": 16, "name": "Brand"},
+                                },
+                                "allIds": ["15", "16"],
                             },
-                            "allIds": ["15", "16"],
                         },
                     },
-                },
-                "allIds": ["5", "9"],
+                    "allIds": ["5", "9"],
+                }
             }
-        })
+        )
         projects = parse_timesheet_data(path)
 
         assert len(projects) == 2
@@ -47,52 +54,53 @@ class TestParseTimesheetData:
 
     def test_empty_tasks_as_list(self) -> None:
         """tasks.byId is [] when empty."""
-        path = self._write_json({
-            "projectsWithTasks": {
-                "byId": {
-                    "5": {"id": 5, "name": "Admin", "tasks": {"byId": [], "allIds": []}},
-                },
-                "allIds": ["5"],
+        path = self._write_json(
+            {
+                "projectsWithTasks": {
+                    "byId": {
+                        "5": {"id": 5, "name": "Admin", "tasks": {"byId": [], "allIds": []}},
+                    },
+                    "allIds": ["5"],
+                }
             }
-        })
+        )
         projects = parse_timesheet_data(path)
         assert len(projects) == 1
         assert projects[0].tasks == []
 
     def test_empty_projects(self) -> None:
         """Empty projectsWithTasks."""
-        path = self._write_json({
-            "projectsWithTasks": {"byId": {}, "allIds": []}
-        })
+        path = self._write_json({"projectsWithTasks": {"byId": {}, "allIds": []}})
         projects = parse_timesheet_data(path)
         assert projects == []
 
     def test_projects_byid_as_list(self) -> None:
         """projectsWithTasks.byId is [] when empty."""
-        path = self._write_json({
-            "projectsWithTasks": {"byId": [], "allIds": []}
-        })
+        path = self._write_json({"projectsWithTasks": {"byId": [], "allIds": []}})
         projects = parse_timesheet_data(path)
         assert projects == []
 
     def test_tasks_sorted_by_name(self) -> None:
-        path = self._write_json({
-            "projectsWithTasks": {
-                "byId": {
-                    "1": {
-                        "id": 1, "name": "Project",
-                        "tasks": {
-                            "byId": {
-                                "3": {"id": 3, "name": "Zebra"},
-                                "1": {"id": 1, "name": "Apple"},
+        path = self._write_json(
+            {
+                "projectsWithTasks": {
+                    "byId": {
+                        "1": {
+                            "id": 1,
+                            "name": "Project",
+                            "tasks": {
+                                "byId": {
+                                    "3": {"id": 3, "name": "Zebra"},
+                                    "1": {"id": 1, "name": "Apple"},
+                                },
+                                "allIds": ["3", "1"],
                             },
-                            "allIds": ["3", "1"],
                         },
                     },
-                },
-                "allIds": ["1"],
+                    "allIds": ["1"],
+                }
             }
-        })
+        )
         projects = parse_timesheet_data(path)
         assert projects[0].tasks[0].name == "Apple"
         assert projects[0].tasks[1].name == "Zebra"

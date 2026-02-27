@@ -4,4 +4,4 @@
 from clockify_export.utils.logging import get_logger, setup_logging
 from clockify_export.utils.storage import StorageManager
 
-__all__ = ["get_logger", "setup_logging", "StorageManager"]
+__all__ = ["StorageManager", "get_logger", "setup_logging"]
