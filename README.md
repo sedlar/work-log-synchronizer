@@ -1,27 +1,31 @@
-# Work Log Synchronizer
+# Clockify Export
 
-A command-line tool to synchronize work logs from Clockify to BambooHR timesheets.
+A two-part tool for getting Clockify time entries into BambooHR timesheets:
+
+1. **Python CLI** (`clockify-export`) — fetches Clockify entries, maps projects/tasks to BambooHR IDs, and outputs BambooHR-ready JSON.
+2. **Tampermonkey userscript** (`bamboo-import.user.js`) — runs on the BambooHR timesheet page to import the JSON, leveraging the user's existing browser session.
+
+This split avoids all BambooHR authentication complexity — Python handles API logic and data mapping, the browser script handles the import.
 
 ## Features
 
-- **Automatic Synchronization**: Sync your Clockify time entries to BambooHR timesheets
-- **Smart Mapping**: Interactively map Clockify projects/tasks to BambooHR projects/tasks
-- **Duplicate Detection**: Prevents duplicate entries when running multiple times
-- **Dry-Run Mode**: Preview changes before applying them
-- **Persistent Configuration**: YAML-based mapping configuration that persists across runs
-- **Detailed Logging**: Comprehensive logging to file and console
-- **Easy Setup**: Interactive configuration wizard
+- **Clockify API Integration**: Fetches time entries with pagination and retry logic
+- **Interactive Mapping**: Map Clockify projects/tasks to BambooHR project/task IDs
+- **Timezone Conversion**: Converts UTC Clockify entries to your workspace timezone
+- **Adjacent Entry Merging**: Merges back-to-back entries for the same project/task
+- **Overlap Detection**: Warns about overlapping time entries
+- **BambooHR Import UI**: Browser-based floating panel with entry preview, conflict detection, and batch import
+- **Persistent Configuration**: YAML-based config and mapping stored in `~/.config/clockify-export/`
 
 ## Requirements
 
 - Python 3.13+
 - Clockify API key
-- BambooHR OAuth 2.0 credentials (Client ID and Client Secret)
-- BambooHR subdomain
+- [Tampermonkey](https://www.tampermonkey.net/) browser extension (for the import step)
 
 ## Installation
 
-### From source
+### CLI
 
 ```bash
 git clone <repository-url>
@@ -29,260 +33,200 @@ cd work-log-synchronizer
 uv sync
 ```
 
-### Install the CLI
+### Tampermonkey Userscript
 
-```bash
-uv pip install -e .
-```
+1. Install the [Tampermonkey](https://www.tampermonkey.net/) browser extension
+2. Open `bamboo-import.user.js` from this repository
+3. Click "Install" when Tampermonkey prompts, or create a new script and paste the contents
 
 ## Quick Start
 
-### 1. Initial Configuration
-
-Run the configuration wizard to set up your Clockify and BambooHR credentials:
+### 1. Setup Clockify API Access
 
 ```bash
-uv run work-log-sync configure
+clockify-export setup
 ```
 
 This will:
 - Prompt for your Clockify API key
-- Prompt for your BambooHR OAuth Client ID and Client Secret
-- Prompt for your BambooHR subdomain
-- Open your browser for BambooHR OAuth authorization
-- Test the connections
-- Save credentials to `~/.work-log-sync/state.json` and `~/.work-log-sync/tokens.json`
+- List your workspaces and let you select one
+- Verify the connection
+- Save config to `~/.config/clockify-export/config.yaml`
 
-**Note:** The OAuth flow will open your default browser for authorization. If you're running remotely, ensure you can access the authorization URL or use the local callback mechanism.
-
-### 2. Sync Work Logs
-
-Synchronize work logs from Clockify to BambooHR:
+### 2. Build Project/Task Mapping
 
 ```bash
-uv run work-log-sync sync
+clockify-export init-mapping
 ```
 
-**Options:**
-- `--from-date YYYY-MM-DD`: Start date for sync (default: last sync date or 30 days ago)
-- `--to-date YYYY-MM-DD`: End date for sync (default: today)
-- `--dry-run`: Show what would be synced without creating entries
-- `--no-interactive`: Don't prompt for unmapped entries
-- `--verbose`: Enable debug logging
+This fetches your Clockify projects and tasks, then walks you through mapping each one to a BambooHR project/task ID.
 
-**Examples:**
+To use BambooHR project/task names in the mapping menus (instead of raw IDs), first extract the timesheet data from BambooHR using the userscript's "Extract Page Data" button, save it as a JSON file, then:
 
 ```bash
-# Sync from specific date range
-uv run work-log-sync sync --from-date 2024-01-01 --to-date 2024-01-31
-
-# Preview changes without applying them
-uv run work-log-sync sync --dry-run
-
-# Sync without interactive prompts
-uv run work-log-sync sync --no-interactive
+clockify-export init-mapping --bamboo-data js-timesheet-data.json
 ```
 
-### 3. View Mappings
-
-View your current project/task mappings:
+### 3. Export Time Entries
 
 ```bash
-uv run work-log-sync mapping
+clockify-export export --from 2026-03-01 --to 2026-03-31
 ```
+
+This outputs BambooHR-ready JSON to stdout. To save to a file:
+
+```bash
+clockify-export export --from 2026-03-01 --to 2026-03-31 -o export.json
+```
+
+### 4. Import into BambooHR
+
+1. Open your BambooHR timesheet page in the browser
+2. The Tampermonkey userscript adds a floating "Clockify Import" panel
+3. Paste the exported JSON into the text area
+4. Preview entries — the panel shows validation status, conflicts, and total hours
+5. Click "Import" to post entries to BambooHR
+
+## CLI Reference
+
+All commands accept `--config-dir PATH` to override the default config directory.
+
+### `clockify-export setup`
+
+Interactive first-time configuration for Clockify API access.
+
+### `clockify-export init-mapping`
+
+Build the project/task mapping interactively.
+
+| Option | Description |
+|--------|-------------|
+| `--bamboo-data PATH` | Path to `js-timesheet-data.json` for BambooHR project/task menus |
+
+### `clockify-export export`
+
+Export Clockify entries to BambooHR-ready JSON.
+
+| Option | Description |
+|--------|-------------|
+| `--from YYYY-MM-DD` | Start date (required) |
+| `--to YYYY-MM-DD` | End date (required) |
+| `-o, --output PATH` | Output file path (defaults to stdout) |
 
 ## Configuration
 
-Configuration is stored in `~/.work-log-sync/`:
+Configuration is stored in `~/.config/clockify-export/`:
 
-- **mapping.yaml**: Project/task mappings
-- **state.json**: Sync state and history
-- **tokens.json**: Cached API credentials (restricted permissions)
-- **work-log-sync.log**: Log file with sync history
+| File | Contents |
+|------|----------|
+| `config.yaml` | Clockify API key and workspace ID |
+| `mapping.yaml` | Project/task mappings |
+| `clockify-export.log` | Log file |
 
-### Mapping Configuration
+### Mapping Format
 
-The `mapping.yaml` file stores the mapping between Clockify and BambooHR projects/tasks:
+`mapping.yaml` maps Clockify project/task pairs to BambooHR IDs:
 
 ```yaml
-projects:
-  "My Project:Development":
-    bamboo_project_id: "1"
-    bamboo_task_id: "101"
-  "My Project:Support":
-    skip: true
+mappings:
+  - clockify_project: "My Project"
+    clockify_task: "Development"
+    bamboo_project_id: 10
+    bamboo_task_id: 42
+  - clockify_project: "Internal"
+    clockify_task: null
+    bamboo_project_id: 5
+    bamboo_task_id: null
 ```
 
-**Fields:**
-- `bamboo_project_id`: BambooHR project ID to sync to
-- `bamboo_task_id`: BambooHR task ID within that project
-- `skip`: Set to `true` to ignore this Clockify entry (not synced)
-
-### Interactive Mapping
-
-When you run sync with unmapped entries, you'll be prompted to:
-
-1. Select a BambooHR project from the available list
-2. Select a task within that project
-3. Or choose to skip the entry entirely
-
-Your selection is automatically saved to `mapping.yaml`.
-
-## Development
-
-### Running Tests
-
-```bash
-uv run pytest
-```
-
-Run with coverage report:
-
-```bash
-uv run pytest --cov=src/work_log_sync --cov-report=html
-```
-
-### Code Quality
-
-Run linting and type checking:
-
-```bash
-# Lint code
-uv run ruff check src/ tests/
-
-# Format code
-uv run ruff format src/ tests/
-
-# Type check
-uv run mypy src/
-```
-
-### Project Structure
+## Project Structure
 
 ```
 work-log-synchronizer/
-├── src/work_log_sync/
-│   ├── cli.py              # CLI interface (Typer)
-│   ├── config.py           # Configuration management
-│   ├── clockify/           # Clockify API client
-│   ├── bamboohr/           # BambooHR API client
-│   │   ├── client.py       # BambooHRClient class
-│   │   ├── models.py       # Pydantic models for BambooHR
-│   │   └── oauth.py        # OAuth 2.0 authentication
-│   ├── sync/               # Synchronization engine
-│   └── utils/              # Utilities (storage, logging)
-├── tests/                  # Test suite
-├── pyproject.toml          # Project configuration
+├── src/clockify_export/
+│   ├── __init__.py          # Package version
+│   ├── cli.py               # Click-based CLI
+│   ├── config.py            # MappingConfig (YAML persistence)
+│   ├── bamboo_data.py       # Parser for BambooHR js-timesheet-data.json
+│   ├── export.py            # Export engine (timezone, merging, overlap detection)
+│   ├── mapper.py            # Interactive mapping prompts
+│   ├── clockify/
+│   │   ├── client.py        # ClockifyClient (pagination, retry)
+│   │   └── models.py        # Pydantic models for Clockify API
+│   └── utils/
+│       ├── logging.py       # Logging setup
+│       └── storage.py       # StorageManager for YAML config files
+├── bamboo-import.user.js    # Tampermonkey userscript for BambooHR import
+├── tests/                   # Test suite
+├── pyproject.toml           # Project configuration
+├── Makefile                 # Code quality commands
 └── README.md
 ```
 
 ## Architecture
 
+### Workflow
+
+```
+Clockify API  →  clockify-export CLI  →  JSON file  →  Tampermonkey userscript  →  BambooHR
+```
+
+1. `clockify-export export` fetches time entries from the Clockify API
+2. Entries are converted to the user's workspace timezone
+3. Adjacent entries for the same project/task are merged
+4. Mapped entries are output as BambooHR-ready JSON
+5. The Tampermonkey userscript imports the JSON into BambooHR via the browser
+
 ### Components
 
-1. **CLI (cli.py)**: Typer-based command-line interface
-2. **API Clients**:
-   - `ClockifyClient`: Handles Clockify API communication with API keys
-   - `BambooHRClient`: Handles BambooHR API communication with OAuth tokens
-   - `BambooHROAuthClient`: Manages BambooHR OAuth 2.0 flow (authorization, token refresh)
-3. **Sync Engine**: Core synchronization logic
-   - `SyncEngine`: Orchestrates the sync process
-   - `TaskMapper`: Interactive mapping management
-4. **Configuration**:
-   - `Config`: Configuration management
-   - `StorageManager`: Persistent storage for state, tokens, and OAuth credentials
+- **ClockifyClient**: HTTP client for the Clockify API (httpx, with pagination and retry)
+- **MappingConfig**: Reads/writes project/task mappings to YAML
+- **Export Engine**: Converts Clockify entries to BambooHR format (timezone conversion, merging, overlap detection)
+- **Mapper**: Interactive CLI flow for mapping Clockify projects to BambooHR IDs
+- **BambooHR Userscript**: Browser-side import with preview, validation, and conflict detection
 
-### Sync Flow
-
-1. Load configuration and API credentials
-2. Fetch Clockify time entries for date range
-3. For each entry:
-   - Check if project/task is mapped
-   - If unmapped and interactive, prompt user for mapping
-   - Check for duplicates in BambooHR
-   - Create entry in BambooHR (or dry-run)
-4. Update last sync date
-5. Log results and summary
-
-## API Credentials
-
-### Clockify API Key
+## Clockify API Key
 
 1. Go to [Clockify Settings](https://app.clockify.me/user/settings)
-2. Click on "API" in the left sidebar
-3. Copy your API key
-
-### BambooHR OAuth 2.0 Credentials
-
-As of April 14, 2025, BambooHR requires OAuth 2.0 authentication for new applications. Here's how to set up your OAuth credentials:
-
-1. **Register your application:**
-   - Visit [developers.bamboohr.com](https://developers.bamboohr.com)
-   - Register your organization if not already done
-   - Click "Create Application"
-   - Provide an application name
-
-2. **Configure application settings:**
-   - In the application details, find the "OAuth Redirect URI" section
-   - Set the redirect URI to: `http://localhost:8000/callback`
-   - Select the required scopes (at minimum: `employees:read`, `timesheets:write`, `projects:read`, `offline_access`)
-   - Save the application
-
-3. **Obtain credentials:**
-   - In the "Credentials" section, copy:
-     - **Client ID**: Your OAuth Client ID
-     - **Client Secret**: Your OAuth Client Secret
-   - Keep these secure!
-
-4. **Get your subdomain:**
-   - Your BambooHR domain is the subdomain in your URL: `https://yourcompany.bamboohr.com`
-   - In this example, your subdomain is `yourcompany`
-
-5. **Use during configuration:**
-   - When running `work-log-sync configure`, enter these credentials
-   - The tool will automatically open your browser for authorization
-   - Grant the necessary permissions
+2. Scroll to "API" section
+3. Generate or copy your API key
 
 ## Troubleshooting
 
-### "OAuth credentials not configured" or "BambooHR not configured"
+### "Not configured" error
 
-Ensure you've run `work-log-sync configure` and your OAuth credentials are saved correctly. Check that your Client ID and Client Secret are valid.
+Run `clockify-export setup` to configure your API key and workspace.
 
-### Browser does not open during configuration
+### "No mappings configured" error
 
-If the browser doesn't automatically open during OAuth authentication, the tool will display the authorization URL. Copy and paste it into your browser manually.
+Run `clockify-export init-mapping` to set up project/task mappings.
 
-### Duplicate entries
+### No time entries found
 
-The tool detects duplicates by checking date, project, task, and hours. If you're still seeing duplicates, check that the mappings are consistent.
-
-### No entries synced
-
-- Verify your date range with `--from-date` and `--to-date`
+- Verify your date range with `--from` and `--to`
 - Check that your Clockify entries have projects assigned
-- Use `--verbose` flag to see detailed logs
+- Review the log file at `~/.config/clockify-export/clockify-export.log`
 
-### Mapping not being saved
+### Unmapped entries skipped during export
 
-Ensure `~/.work-log-sync/` directory is writable and has sufficient permissions (755).
+Run `clockify-export init-mapping` to add mappings for new projects/tasks.
 
-## Logs
+### Userscript not appearing on BambooHR
 
-Logs are stored in `~/.work-log-sync/work-log-sync.log`:
+- Ensure Tampermonkey is enabled
+- Check that the script's `@match` pattern matches your BambooHR URL (`https://*.bamboohr.com/employees/timesheet*`)
+
+## Development
+
+See [DEVELOPMENT.md](DEVELOPMENT.md) for setup, testing, and code quality instructions.
+
+### Quick Reference
 
 ```bash
-# View recent logs
-tail -f ~/.work-log-sync/work-log-sync.log
+make check   # Run all checks (lint, format, mypy, tests)
+make fix     # Auto-fix lint and formatting issues
+make test    # Run tests with coverage
 ```
-
-## Contributing
-
-When contributing, please:
-
-1. Run the test suite: `uv run pytest`
-2. Check code quality: `uv run ruff check` and `uv run mypy`
-3. Format code: `uv run ruff format`
 
 ## License
 

@@ -1,301 +1,155 @@
-# Work Log Synchronizer - Usage Examples
+# Clockify Export - Usage Examples
 
-This document provides practical examples of how to use the work-log-sync tool.
+Practical examples for the `clockify-export` CLI and the BambooHR import userscript.
 
 ## Initial Setup
 
-### 1. First-time Configuration
+### 1. Configure Clockify API Access
 
 ```bash
-work-log-sync configure
+clockify-export setup
 ```
 
 Output:
 ```
-Work Log Synchronizer Configuration
+Clockify Export Setup
 
-Clockify Configuration
 Enter your Clockify API key: ••••••••••••••••
-✓ Clockify API key saved
 
-BambooHR Configuration
-Enter your BambooHR subdomain (e.g., 'mycompany'): mycompany
-Enter your BambooHR API key: ••••••••••••••••
-✓ BambooHR configuration saved
+Available workspaces:
+  1. My Company
 
-Testing connections...
-✓ Connected to Clockify as John Doe
-✓ Connected to BambooHR (found 45 employees)
+Auto-selected: My Company
 
-Configuration complete!
-Run 'work-log-sync sync' to start syncing work logs.
+Connected as John Doe
+Workspace: My Company
+Config saved.
+
+Next: run clockify-export init-mapping to set up project/task mapping.
 ```
 
-## Common Workflows
+### 2. Build Project/Task Mapping
 
-### Scenario 1: Sync Last 7 Days of Work
+Without BambooHR data (enter raw IDs):
 
 ```bash
-work-log-sync sync --from-date $(date -d '7 days ago' +%Y-%m-%d) --to-date $(date +%Y-%m-%d)
+clockify-export init-mapping
 ```
 
-This syncs all work entries from the last 7 days.
-
-### Scenario 2: Preview Changes Before Syncing
+With BambooHR project/task names (recommended):
 
 ```bash
-work-log-sync sync --dry-run
+clockify-export init-mapping --bamboo-data js-timesheet-data.json
+```
+
+To get `js-timesheet-data.json`: open your BambooHR timesheet in the browser, click the "Extract Page Data" button in the userscript panel, and save the copied JSON to a file.
+
+## Exporting Time Entries
+
+### Export a Date Range to stdout
+
+```bash
+clockify-export export --from 2026-03-01 --to 2026-03-31
+```
+
+JSON is printed to stdout; warnings and summary go to stderr.
+
+### Export to a File
+
+```bash
+clockify-export export --from 2026-03-01 --to 2026-03-31 -o march.json
 ```
 
 Output:
 ```
-Starting [DRY RUN] mode...
-
-[DRY RUN] Would create entry: Development:Backend -> 6.5h on 2024-01-15
-[DRY RUN] Would create entry: Support:Bug Fixes -> 1.5h on 2024-01-15
-
-╭─ Sync Results ─╮
-│ Metric     │ Count  │
-├────────────┼────────┤
-│ Synced     │ 2      │
-│ Skipped    │ 0      │
-│ Failed     │ 0      │
-│ Unmapped   │ 0      │
-╰────────────┴────────╯
+Exported 42 entries to march.json
 ```
 
-### Scenario 3: Handle Unmapped Entries Interactively
+### Export Last Week
 
 ```bash
-work-log-sync sync --from-date 2024-01-01 --to-date 2024-01-10
+clockify-export export \
+  --from $(date -d 'last monday' +%Y-%m-%d) \
+  --to $(date -d 'last friday' +%Y-%m-%d) \
+  -o last-week.json
 ```
 
-Output (when unmapped entries are found):
+### Handling Unmapped Entries
+
+If entries are unmapped, the export warns you:
+
 ```
-[yellow]Unmapped Clockify entry: Client Project:Design[/yellow]
+Warning: Overlap detected: 09:00-10:00 and 09:30-11:00 on 2026-03-15
 
-╭─ Available BambooHR Projects ─╮
-│ Index │ Project            │
-├───────┼────────────────────┤
-│ 1     │ Internal            │
-│ 2     │ Client Project      │
-│ 3     │ Support             │
-│ 4     │ Research            │
-│ 5     │ Skip this entry     │
-╰───────┴────────────────────╯
+Unmapped entries (skipped):
+  - Research:Spike
+  - Internal:Onboarding
 
-Select project (1-5): 2
-
-╭─ Available Tasks ─╮
-│ Index │ Task               │
-├───────┼────────────────────┤
-│ 1     │ Design - UX        │
-│ 2     │ Design - Graphics  │
-│ 3     │ Design - Web       │
-╰───────┴────────────────────╯
-
-Select task (1-3): 1
-
-Saved mapping for Client Project:Design
-
-╭─ Sync Results ─╮
-│ Metric     │ Count  │
-├────────────┼────────┤
-│ Synced     │ 3      │
-│ Skipped    │ 1      │
-│ Failed     │ 0      │
-│ Unmapped   │ 0      │
-╰────────────┴────────╯
+Exported 38 entries.
 ```
 
-### Scenario 4: Sync Without Interactive Prompts
+Run `clockify-export init-mapping` to add mappings for the skipped entries.
+
+## Importing into BambooHR
+
+1. Open your BambooHR timesheet page (`https://yourcompany.bamboohr.com/employees/timesheet/...`)
+2. The Tampermonkey userscript shows a floating "Clockify Import" panel
+3. Paste the exported JSON into the text area
+4. Review the preview:
+   - Each entry shows date, time, project, task, and validation status
+   - Conflicts with existing entries are flagged
+   - Total hours are displayed
+5. Click "Import" to post all valid entries
+
+## Custom Config Directory
+
+All commands support `--config-dir` for non-default locations:
 
 ```bash
-work-log-sync sync --no-interactive
+clockify-export setup --config-dir ~/my-config
+clockify-export init-mapping --config-dir ~/my-config
+clockify-export export --from 2026-03-01 --to 2026-03-31 --config-dir ~/my-config
 ```
 
-Only syncs entries that are already mapped. Unmapped entries are skipped and reported:
-
-```
-╭─ Sync Results ─╮
-│ Metric     │ Count  │
-├────────────┼────────┤
-│ Synced     │ 10     │
-│ Skipped    │ 2      │
-│ Failed     │ 0      │
-│ Unmapped   │ 3      │
-╰────────────┴────────╯
-
-[yellow]Unmapped entries:[/yellow]
-  - Research:New Feature
-  - Training:Python Course
-  - Client XYZ:Consultation
-```
-
-### Scenario 5: Sync Specific Date Range
+## Checking Logs
 
 ```bash
-work-log-sync sync --from-date 2024-01-15 --to-date 2024-01-31
-```
-
-This syncs entries between January 15-31, 2024.
-
-### Scenario 6: Enable Verbose Logging
-
-```bash
-work-log-sync sync --verbose
-```
-
-Detailed debug output:
-```
-work_log_sync.cli - DEBUG - Work Log Synchronizer v0.1.0
-work_log_sync.sync.engine - INFO - Syncing work logs from 2024-01-15 to 2024-01-31
-work_log_sync.clockify.client - DEBUG - Fetching time entries for user_123
-work_log_sync.clockify.client - DEBUG - Found 15 time entries
-work_log_sync.sync.engine - DEBUG - Skipping entry entry_789 with no project
-work_log_sync.sync.engine - INFO - Created BambooHR entry: Development:Backend -> 6.5h on 2024-01-15
-...
-```
-
-## Viewing Mappings
-
-### List Current Mappings
-
-```bash
-work-log-sync mapping
-```
-
-Output:
-```
-╭─ Project/Task Mappings ─╮
-│ Clockify           │ BambooHR Project │ BambooHR Task │ Action │
-├────────────────────┼──────────────────┼───────────────┼────────┤
-│ Development:Backend│ 1                │ 101           │ SYNC   │
-│ Development:Frontend
-                    │ 1                │ 102           │ SYNC   │
-│ Support:Bug Fixes  │ 2                │ 201           │ SYNC   │
-│ Internal:Meetings  │ -                │ -             │ SKIP   │
-│ Break              │ -                │ -             │ SKIP   │
-╰────────────────────┴──────────────────┴───────────────┴────────╯
-```
-
-## Scheduling Regular Syncs
-
-### Linux/macOS - Crontab
-
-Sync daily at 9 AM:
-
-```bash
-# Add to crontab
-crontab -e
-
-# Add this line:
-0 9 * * * /path/to/uv run work-log-sync sync >> ~/.work-log-sync/cron.log 2>&1
-```
-
-Or sync every 2 hours:
-
-```bash
-0 */2 * * * /path/to/uv run work-log-sync sync
-```
-
-### Windows - Task Scheduler
-
-1. Create a batch file `sync.bat`:
-```batch
-@echo off
-cd C:\path\to\work-log-synchronizer
-uv run work-log-sync sync
-```
-
-2. Create a scheduled task running this batch file at desired intervals
-
-## Troubleshooting Examples
-
-### Check Logs
-
-```bash
-# View last 50 lines of log
-tail -50 ~/.work-log-sync/work-log-sync.log
+# View recent log entries
+tail -50 ~/.config/clockify-export/clockify-export.log
 
 # Follow logs in real-time
-tail -f ~/.work-log-sync/work-log-sync.log
-
-# Search for errors
-grep ERROR ~/.work-log-sync/work-log-sync.log
+tail -f ~/.config/clockify-export/clockify-export.log
 ```
-
-### Dry-run to Diagnose Issues
-
-```bash
-work-log-sync sync --dry-run --verbose
-```
-
-### Re-configure Credentials
-
-```bash
-work-log-sync configure
-```
-
-This will update your stored credentials.
 
 ## Working with Mappings
 
-### Manual Mapping Edits
-
-Edit `~/.work-log-sync/mapping.yaml` directly:
-
-```yaml
-projects:
-  "My Project:Development":
-    bamboo_project_id: "1"
-    bamboo_task_id: "101"
-  "Internal:Admin":
-    skip: true
-```
-
-### Skip New Projects
-
-Add to `mapping.yaml`:
-
-```yaml
-projects:
-  "Time Off":
-    skip: true
-```
-
-Then sync won't try to sync time entries from "Time Off".
-
-## Advanced Usage
-
-### Sync Month-by-Month
-
-For large date ranges, sync month by month to prevent overwhelming the system:
+### View Current Mappings
 
 ```bash
-# January
-work-log-sync sync --from-date 2024-01-01 --to-date 2024-01-31
-
-# February
-work-log-sync sync --from-date 2024-02-01 --to-date 2024-02-29
-
-# And so on...
+cat ~/.config/clockify-export/mapping.yaml
 ```
 
-### Export Results
+### Edit Mappings Manually
 
-Capture sync results to a file:
+Edit `~/.config/clockify-export/mapping.yaml` directly:
 
-```bash
-work-log-sync sync --verbose > sync_results_2024-01-15.log 2>&1
+```yaml
+mappings:
+  - clockify_project: "My Project"
+    clockify_task: "Development"
+    bamboo_project_id: 10
+    bamboo_task_id: 42
+  - clockify_project: "Internal"
+    clockify_task: null
+    bamboo_project_id: 5
+    bamboo_task_id: null
 ```
 
-## Tips & Best Practices
+Set `clockify_task: null` to match all tasks under a project.
 
-1. **Start with dry-run**: Always preview changes with `--dry-run` before the actual sync
-2. **Regular syncs**: Schedule daily syncs to keep entries fresh
-3. **Review mappings**: Periodically review `mapping.yaml` to ensure correct mappings
-4. **Check logs**: Review `work-log-sync.log` for any warnings or errors
-5. **Test credentials**: Run `configure` after credential changes to verify they work
-6. **Non-interactive mode**: Use `--no-interactive` in scheduled tasks to avoid hanging
-7. **Monitor duration**: Very large date ranges might take time; start with recent dates
+## Tips
+
+1. **Extract BambooHR data first**: Use the userscript's "Extract Page Data" button before running `init-mapping` — it gives you project/task names instead of having to look up raw IDs
+2. **Review unmapped entries**: After export, check for unmapped entries and add mappings before re-exporting
+3. **Check the preview**: The userscript preview shows conflicts with existing BambooHR entries before you import
+4. **Pipe to clipboard**: `clockify-export export --from ... --to ... | xclip -selection clipboard` to paste directly into the userscript
